@@ -1,0 +1,20 @@
+# Python packages for this project (versions match the tested environment)
+ansible-core==2.21.6
+ansible-lint==26.11.0
+yamllint==1.38.0
+# SSH for network_cli
+ansible-pylibssh==1.4.0
+paramiko==4.0.0
+scp==0.16.2
+# NETCONF (network_facts, cisco_snmp)
+ncclient==0.7.1
+xmltodict==1.0.4
+lxml==6.1.3
+# filters / parsing used by the cisco.* and ansible.utils collections
+netaddr==1.3.0
+jmespath==1.1.0
+textfsm==2.1.0
+# NetBox inventory and Vault access
+pynetbox==7.9.0
+hvac==2.4.0
+requests==2.34.2
