@@ -1,0 +1,28 @@
+---
+# Shared helper: platform detection, NETCONF/CLI transport selection,
+# NetBox site lookup and management interface/VRF detection.
+# Replaces: netbox_getsite, get_mgnt_vrf, ansible_ios_get_mgnt_vrf, nxos_get_mgnt_vrf.
+
+network_facts_debug: false
+network_facts_netbox_enabled: true
+network_facts_mgmt_enabled: true
+
+# ios | nxos | aireos. Empty = detect from ansible_network_os.
+network_platform_override: ""
+
+# ---- Transport (NETCONF first, CLI fallback) ----
+# auto    = probe tcp/830 + NETCONF session, fall back to CLI
+# netconf = require NETCONF, fail the host if unusable
+# cli     = never probe, always CLI
+network_transport_preference: auto
+network_netconf_port: 830
+network_netconf_probe_timeout: 3
+# If a NETCONF edit fails mid-run, redo that role's work over CLI
+network_netconf_fallback_on_error: true
+# Save running -> startup after NETCONF edits (NX-OS needs one CLI command for this)
+network_save_config: false
+
+# ---- NetBox (credentials come from env/Vault, no placeholders) ----
+netbox_url: "{{ lookup('env', 'NETBOX_URL') }}"
+netbox_token: "{{ lookup('env', 'NETBOX_API') }}"
+netbox_validate_certs: false

@@ -1,0 +1,31 @@
+---
+- name: Common setup
+  ansible.builtin.include_tasks: init.yml
+
+- name: Show cisco_snmp role version
+  ansible.builtin.debug:
+    msg: "cisco_snmp role version {{ cisco_snmp_version }} ({{ cisco_snmp_os }}, transport={{ network_transport }})"
+
+- name: NetBox location
+  ansible.builtin.include_tasks: netbox.yml
+  when: cisco_snmp_netbox_enabled | bool
+
+- name: Management ACL from NetBox
+  ansible.builtin.include_tasks: acl.yml
+  when: cisco_snmp_netbox_enabled | bool
+
+- name: SNMP location (NETCONF, CLI fallback)
+  ansible.builtin.include_tasks: location.yml
+  when: SNMP_LOCATION is defined and SNMP_LOCATION | length > 0
+
+- name: Configure SNMP on IOS / IOS-XE
+  ansible.builtin.include_tasks: ios.yml
+  when: cisco_snmp_os == 'ios'
+
+- name: Configure SNMP on NX-OS
+  ansible.builtin.include_tasks: nxos.yml
+  when: cisco_snmp_os == 'nxos'
+
+- name: Sync SNMPv3 credentials to Cisco ISE
+  ansible.builtin.include_tasks: ise.yml
+  when: cisco_snmp_ise_enabled | bool

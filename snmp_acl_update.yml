@@ -1,0 +1,30 @@
+---
+# Refresh only the SNMP management ACL from NetBox (IPs tagged cisco_snmp.acl.tag).
+# Replaces the old standalone mgnt_acl / ACL_update.yml run.
+#
+# Tower: one job template, no job tags needed. Limit is prompted on launch.
+# NetBox URL/token come from the environment (NETBOX_URL / NETBOX_API, populated from Vault).
+#
+#   ansible-playbook -i netbox_inventory.yml snmp_acl_update.yml --limit <host> --check --diff
+#
+# Optional extra vars:
+#   mgnt_acl: {name: MANAGEMENT, tag: snmp_acl_allow}   # default is cisco_snmp.acl
+#   network_transport_preference: cli                   # skip the NETCONF probe
+#
+# Safety: the ACL is never changed when NetBox returns no IPv4 addresses or more than 1000
+# (an empty IOS ACL would deny all management access), so a bad NetBox answer fails the host.
+- name: Refresh SNMP management ACL from NetBox
+  hosts: all
+  gather_facts: false
+  # Update devices in small batches so one bad NetBox answer cannot touch every device at once
+  serial: "{{ acl_update_batch | default('25%') }}"
+  max_fail_percentage: 0
+  roles:
+    - role: netbox_network_os
+      tags: [always]
+  tasks:
+    - name: Update management ACL
+      ansible.builtin.include_role:
+        name: cisco_snmp
+        tasks_from: acl.yml
+      tags: [acl]

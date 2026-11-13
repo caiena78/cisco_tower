@@ -1,0 +1,56 @@
+---
+# Input: netbox_network_os_response (NetBox /api/dcim/devices/ result)
+- name: Read the platform slug
+  ansible.builtin.set_fact:
+    netbox_network_os_slug: >-
+      {%- set r = netbox_network_os_response.json.results | default([]) -%}
+      {%- if r | length == 1 and r[0].platform is defined and r[0].platform -%}
+      {{ r[0].platform.slug | lower }}
+      {%- endif -%}
+    netbox_network_os_matches: "{{ netbox_network_os_response.json.results | default([]) | length }}"
+
+# An empty template result can come back as None; keep the slug a plain string
+- name: Normalise the slug
+  ansible.builtin.set_fact:
+    netbox_network_os_slug: "{{ '' if netbox_network_os_slug is none else netbox_network_os_slug }}"
+
+- name: Refuse an ambiguous device name
+  ansible.builtin.fail:
+    msg: "NetBox has {{ netbox_network_os_matches }} devices named '{{ netbox_network_os_device_name }}' (names are unique per site/tenant); set netbox_network_os_device_name"
+  when: netbox_network_os_matches | int > 1
+
+- name: Map the slug to ansible_network_os
+  ansible.builtin.set_fact:
+    netbox_network_os_value: "{{ netbox_network_os_map[netbox_network_os_slug] | default('') }}"
+
+- name: Use the default for unmapped devices
+  ansible.builtin.set_fact:
+    netbox_network_os_value: "{{ netbox_network_os_default }}"
+  when:
+    - netbox_network_os_value | length == 0
+    - netbox_network_os_on_unmapped == 'default'
+
+- name: Explain why no value was found
+  ansible.builtin.fail:
+    msg: >-
+      {{ inventory_hostname }}: cannot set ansible_network_os -
+      {% if netbox_network_os_matches | int == 0 %}device '{{ netbox_network_os_device_name }}' not found in NetBox
+      {% elif netbox_network_os_slug | length == 0 %}device has no platform in NetBox
+      {% else %}platform '{{ netbox_network_os_slug }}' is not in netbox_network_os_map{% endif %}
+  when:
+    - netbox_network_os_value | length == 0
+    - netbox_network_os_on_unmapped in ['fail', 'default']
+
+- name: Apply ansible_network_os
+  ansible.builtin.set_fact:
+    ansible_network_os: "{{ netbox_network_os_value }}"
+  when: netbox_network_os_value | length > 0
+
+- name: Show result
+  ansible.builtin.debug:
+    msg: "{{ inventory_hostname }}: NetBox platform '{{ netbox_network_os_slug | default('') }}' -> ansible_network_os={{ netbox_network_os_value }}"
+  when: netbox_network_os_debug | bool
+
+- name: Mark done
+  ansible.builtin.set_fact:
+    netbox_network_os_done: true

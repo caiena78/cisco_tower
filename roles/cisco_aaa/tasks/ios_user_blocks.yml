@@ -1,0 +1,23 @@
+---
+# Local fallback user / enable secret. Input: cisco_aaa_ios_algo (scrypt | secret | password).
+# Fix: the old SSH role sent "user" instead of "username" in the scrypt branch, so it always fell to rescue.
+- name: Build local user blocks
+  ansible.builtin.set_fact:
+    cisco_aaa_ios_user_blocks: >-
+      {%- set u = cisco_aaa_local_user -%}
+      {%- set b = [] -%}
+      {%- if u.username | length > 0 and u.password | length > 0 -%}
+      {%- if cisco_aaa_ios_algo == 'scrypt' -%}
+      {%- set lines = ['username ' ~ u.username ~ ' privilege 15 algorithm-type scrypt secret ' ~ u.password] -%}
+      {%- if u.enable_secret | length > 0 -%}{%- set _ = lines.append('enable algorithm-type scrypt secret ' ~ u.enable_secret) -%}{%- endif -%}
+      {%- elif cisco_aaa_ios_algo == 'secret' -%}
+      {%- set lines = ['username ' ~ u.username ~ ' privilege 15 secret ' ~ u.password] -%}
+      {%- if u.enable_secret | length > 0 -%}{%- set _ = lines.append('enable secret ' ~ u.enable_secret) -%}{%- endif -%}
+      {%- else -%}
+      {%- set lines = ['username ' ~ u.username ~ ' privilege 15 password ' ~ u.password] -%}
+      {%- if u.enable_secret | length > 0 -%}{%- set _ = lines.append('enable secret ' ~ u.enable_secret) -%}{%- endif -%}
+      {%- endif -%}
+      {%- set _ = b.append({'parents': [], 'lines': lines, 'match': 'none'}) -%}
+      {%- endif -%}
+      {{ b }}
+  no_log: "{{ not (cisco_aaa_debug | bool) }}"

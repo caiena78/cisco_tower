@@ -1,0 +1,89 @@
+---
+# Builds cisco_aaa_ios_blocks = ordered list of {parents, lines, match, soft} for IOS.
+# Shared by ssh (ios.yml -> ios_config) and telnet (ios_telnet.yml -> flattened to one session),
+# so the two transports cannot drift apart.
+# Inputs: cisco_aaa_ios_running (full running-config text), cisco_aaa_ios_syntax (modern | legacy),
+#         cisco_aaa_servers, cisco_aaa_group, mgntINT, vrf_name, cisco_aaa_cleanup_effective
+- name: Build IOS AAA config blocks
+  ansible.builtin.set_fact:
+    cisco_aaa_ios_blocks: >-
+      {%- set G = cisco_aaa_group -%}
+      {%- set run = cisco_aaa_ios_running.splitlines() -%}
+      {%- set modern = (cisco_aaa_ios_syntax == 'modern') -%}
+      {%- set vrf = vrf_name | default('NOT_SET') -%}
+      {%- set src = mgntINT | default('NOT_SET') -%}
+      {%- set b = [] -%}
+      {# --- current state of the TACACS group in the running-config --- #}
+      {%- set grp = namespace(on=false, vrf='', servers=[]) -%}
+      {%- for l in run -%}
+      {%- if l == 'aaa group server tacacs+ ' ~ G -%}{%- set grp.on = true -%}
+      {%- elif grp.on and not (l.startswith(' ')) -%}{%- set grp.on = false -%}
+      {%- elif grp.on -%}
+      {%- set m = l.strip().split(' ') -%}
+      {%- if m[0] == 'ip' and m[1] == 'vrf' and m[2] == 'forwarding' -%}{%- set grp.vrf = m[3] -%}{%- endif -%}
+      {%- if m[0] == 'server' -%}{%- set grp.servers = grp.servers + [l.strip()] -%}{%- endif -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {# --- 1. aaa new-model --- #}
+      {%- set _ = b.append({'parents': [], 'lines': ['aaa new-model']}) -%}
+      {# --- 2. remove command authorization and named accounting lists (they cause lockouts) --- #}
+      {%- set rm = (run | select('match', '^aaa authorization commands ') | list)
+                   + (run | select('match', '^aaa accounting (exec|commands [0-9]+) (?!default )') | list) -%}
+      {%- if rm | length > 0 -%}
+      {%- set _ = b.append({'parents': [], 'lines': rm | map('regex_replace', '^', 'no ') | list, 'match': 'none', 'soft': true}) -%}
+      {%- endif -%}
+      {# --- 3. global source interface --- #}
+      {%- if src != 'NOT_SET' -%}
+      {%- set _ = b.append({'parents': [], 'lines': ['ip tacacs source-interface ' ~ src]}) -%}
+      {%- endif -%}
+      {# --- 4. servers --- #}
+      {%- for s in cisco_aaa_servers -%}
+      {%- if modern -%}
+      {%- set _ = b.append({'parents': ['tacacs server ' ~ s.name], 'lines': ['address ipv4 ' ~ s.address, 'key ' ~ s.key, 'timeout ' ~ s.timeout]}) -%}
+      {%- else -%}
+      {%- set _ = b.append({'parents': [], 'lines': ['tacacs-server host ' ~ s.address ~ ' key ' ~ s.key]}) -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {# --- 5. group: drop a wrong VRF, then members, VRF and source interface --- #}
+      {%- if vrf != 'NOT_SET' and grp.vrf | length > 0 and grp.vrf != vrf -%}
+      {%- set _ = b.append({'parents': ['aaa group server tacacs+ ' ~ G], 'lines': ['no ip vrf forwarding ' ~ grp.vrf], 'match': 'none'}) -%}
+      {%- endif -%}
+      {%- set glines = [] -%}
+      {%- for s in cisco_aaa_servers -%}
+      {%- set _ = glines.append('server name ' ~ s.name if modern else 'server ' ~ s.address) -%}
+      {%- endfor -%}
+      {%- if vrf != 'NOT_SET' -%}{%- set _ = glines.append('ip vrf forwarding ' ~ vrf) -%}{%- endif -%}
+      {%- if src != 'NOT_SET' -%}{%- set _ = glines.append('ip tacacs source-interface ' ~ src ~ ((' vrf ' ~ vrf) if vrf != 'NOT_SET' else '')) -%}{%- endif -%}
+      {%- set _ = b.append({'parents': ['aaa group server tacacs+ ' ~ G], 'lines': glines}) -%}
+      {# --- 6. optional cleanup of servers not in the list --- #}
+      {%- if cisco_aaa_cleanup_effective | bool -%}
+      {%- set want = (cisco_aaa_servers | map(attribute='name') | map('regex_replace', '^', 'server name ') | list)
+                     + (cisco_aaa_servers | map(attribute='address') | map('regex_replace', '^', 'server ') | list) -%}
+      {%- set stale = grp.servers | difference(want) -%}
+      {%- if stale | length > 0 -%}
+      {%- set _ = b.append({'parents': ['aaa group server tacacs+ ' ~ G], 'lines': stale | map('regex_replace', '^', 'no ') | list, 'match': 'none'}) -%}
+      {%- endif -%}
+      {%- endif -%}
+      {# --- 7. AAA method lists --- #}
+      {%- set _ = b.append({'parents': [], 'lines': ['aaa authentication suppress null-username', 'aaa accounting suppress null-username'], 'soft': true}) -%}
+      {%- set aaa = [
+          'aaa authentication login default group ' ~ G ~ ' local-case',
+          'aaa authentication enable default group ' ~ G ~ ' enable',
+          'aaa authorization console',
+          'aaa authorization config-commands',
+          'aaa authorization exec default group ' ~ G ~ ' local if-authenticated',
+          'aaa accounting send stop-record authentication failure',
+          'aaa accounting exec default start-stop group ' ~ G
+        ] -%}
+      {%- for lvl in cisco_aaa.ios.accounting_levels -%}
+      {%- set _ = aaa.append('aaa accounting commands ' ~ lvl ~ ' default start-stop group ' ~ G) -%}
+      {%- endfor -%}
+      {%- set _ = aaa.append('aaa accounting system default start-stop group ' ~ G) -%}
+      {%- set _ = b.append({'parents': [], 'lines': aaa}) -%}
+      {# --- 8. console and vty use the default method list --- #}
+      {%- set _ = b.append({'parents': ['line con 0'], 'lines': ['login authentication default']}) -%}
+      {%- for l in run | select('match', '^line vty ') | list -%}
+      {%- set _ = b.append({'parents': [l], 'lines': ['login authentication default', 'authorization exec default'], 'soft': true}) -%}
+      {%- endfor -%}
+      {{ b }}
+  no_log: "{{ not (cisco_aaa_debug | bool) }}"

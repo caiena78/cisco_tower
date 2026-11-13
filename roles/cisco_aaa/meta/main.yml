@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: cisco_aaa
+  author: Chad Aiena
+  description: TACACS+ AAA on Cisco IOS/IOS-XE (SSH or telnet), NX-OS and AireOS WLC, with Cisco ISE device sync
+  company: Sapphire Health
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: IOS
+      versions: [all]
+    - name: NXOS
+      versions: [all]
+dependencies: []
+# Calls network_facts via include_role.
+# collections: cisco.ios, cisco.nxos, community.network (AireOS), ansible.netcommon (telnet)

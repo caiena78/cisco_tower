@@ -1,0 +1,133 @@
+---
+- name: Determine SNMPv3 user(s) designated for Cisco ISE
+  set_fact:
+    ise_snmp_users: "{{ cisco_snmp.users | selectattr('cisco_ise', 'defined') | selectattr('cisco_ise') | list }}"
+
+- name: Skip message if no SNMPv3 user is flagged for Cisco ISE
+  debug:
+    msg: "No user in cisco_snmp.users has cisco_ise: true - skipping Cisco ISE SNMP sync"
+  when: ise_snmp_users | length == 0
+
+- name: Sync SNMPv3 credentials to Cisco ISE
+  when: ise_snmp_users | length > 0
+  block:
+    - name: Set desired ISE SNMP user (first flagged user)
+      set_fact:
+        ise_snmp_user: "{{ ise_snmp_users | first }}"
+
+    - name: Map SNMPv3 protocols to Cisco ISE values
+      set_fact:
+        ise_snmp_auth_protocol: "{{ ise_snmp_user.auth_proto | upper }}"
+        ise_snmp_priv_protocol: >-
+          {{
+            ('AES' ~ (ise_snmp_user.priv_bits | default(128) | string))
+            if (ise_snmp_user.priv_proto | lower) == 'aes'
+            else (ise_snmp_user.priv_proto | upper)
+          }}
+
+    - name: Check if device exists in Cisco ISE by IP
+      ansible.builtin.uri:
+        url: "https://{{ ise_hostname }}:{{ ise_port }}/ers/config/networkdevice?filter=ipaddress.EQ.{{ ansible_host }}"
+        method: GET
+        url_username: "{{ ise_username }}"
+        url_password: "{{ ise_password }}"
+        force_basic_auth: yes
+        validate_certs: "{{ ise_verify }}"
+        headers:
+          Accept: "application/json"
+        status_code: 200
+      register: ise_snmp_ip_check
+      delegate_to: localhost
+      vars:
+        # Set as a var (not the connection: keyword) so group_vars ansible_connection=network_cli does not apply
+        ansible_connection: local
+
+    - name: Set ISE device-found flag
+      set_fact:
+        ise_snmp_device_found: "{{ ise_snmp_ip_check.json.SearchResult.total | int > 0 }}"
+
+    - name: Get full device record from Cisco ISE
+      ansible.builtin.uri:
+        url: "https://{{ ise_hostname }}:{{ ise_port }}/ers/config/networkdevice/{{ ise_snmp_ip_check.json.SearchResult.resources[0].id }}"
+        method: GET
+        url_username: "{{ ise_username }}"
+        url_password: "{{ ise_password }}"
+        force_basic_auth: yes
+        validate_certs: "{{ ise_verify }}"
+        headers:
+          Accept: "application/json"
+        status_code: 200
+      register: ise_snmp_device_details
+      delegate_to: localhost
+      vars:
+        # Set as a var (not the connection: keyword) so group_vars ansible_connection=network_cli does not apply
+        ansible_connection: local
+      when: ise_snmp_device_found
+
+    - name: Build updated SNMP settings for Cisco ISE
+      set_fact:
+        ise_snmp_settings: >-
+          {{
+            (ise_snmp_device_details.json.NetworkDevice.snmpsettings | default({}))
+            | combine({
+                'version': 'THREE',
+                'username': ise_snmp_user.username,
+                'securityLevel': 'PRIV',
+                'authProtocol': ise_snmp_auth_protocol,
+                'authPassword': ise_snmp_user.auth_pass,
+                'privacyProtocol': ise_snmp_priv_protocol,
+                'privacyPassword': ise_snmp_user.priv_pass
+              })
+          }}
+      when: ise_snmp_device_found
+
+    - name: Push updated SNMP settings to Cisco ISE
+      ansible.builtin.uri:
+        url: "https://{{ ise_hostname }}:{{ ise_port }}/ers/config/networkdevice/{{ ise_snmp_device_details.json.NetworkDevice.id }}"
+        method: PUT
+        url_username: "{{ ise_username }}"
+        url_password: "{{ ise_password }}"
+        force_basic_auth: yes
+        validate_certs: "{{ ise_verify }}"
+        headers:
+          Content-Type: "application/json"
+          Accept: "application/json"
+        body_format: json
+        body:
+          NetworkDevice: "{{ ise_snmp_device_details.json.NetworkDevice | combine({'snmpsettings': ise_snmp_settings}) }}"
+        status_code: [200, 201]
+      no_log: true
+      register: ise_snmp_put_result
+      delegate_to: localhost
+      vars:
+        # Set as a var (not the connection: keyword) so group_vars ansible_connection=network_cli does not apply
+        ansible_connection: local
+      ignore_errors: true
+      when: ise_snmp_device_found
+
+    - name: Log full ISE response for troubleshooting on failure
+      ansible.builtin.copy:
+        content: "{{ ise_snmp_put_result | to_nice_json }}"
+        dest: "{{ playbook_dir }}/logs/ise_snmp_put_{{ inventory_hostname }}.json"
+      no_log: true
+      delegate_to: localhost
+      vars:
+        # Set as a var (not the connection: keyword) so group_vars ansible_connection=network_cli does not apply
+        ansible_connection: local
+      when:
+        - ise_snmp_device_found
+        - ise_snmp_put_result is failed
+
+    - name: Fail if Cisco ISE SNMP update failed
+      ansible.builtin.fail:
+        msg: >-
+          Failed to update SNMP settings in Cisco ISE for {{ inventory_hostname }}.
+          Full response logged to {{ playbook_dir }}/logs/ise_snmp_put_{{ inventory_hostname }}.json
+      when:
+        - ise_snmp_device_found
+        - ise_snmp_put_result is failed
+
+    - name: Warn if device was not found in Cisco ISE by IP
+      debug:
+        msg: "{{ ansible_host }} not found in Cisco ISE (by IP) - skipped SNMP settings sync for user {{ ise_snmp_user.username }}"
+      when: not ise_snmp_device_found

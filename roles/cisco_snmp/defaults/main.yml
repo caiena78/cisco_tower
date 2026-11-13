@@ -1,0 +1,63 @@
+---
+cisco_snmp_version: "2.0"
+
+# ios | nxos. Empty = auto-detect from ansible_network_os.
+cisco_snmp_platform: ""
+
+cisco_snmp_netbox_enabled: true
+cisco_snmp_ise_enabled: true
+cisco_snmp_acl_debug: false
+
+# NetBox credentials: from env (NETBOX_URL / NETBOX_API) unless set in inventory/Vault.
+# No placeholder values, so they can never shadow the real ones.
+netbox_url: "{{ lookup('env', 'NETBOX_URL') }}"
+netbox_token: "{{ lookup('env', 'NETBOX_API') }}"
+netbox_validate_certs: false
+
+# Remove SNMPv3 users/hosts on the device that are not in cisco_snmp.users
+cisco_snmp_cleanup: false
+cisco_snmp_protected_users:
+  - admin
+
+cisco_snmp:
+  acl:
+    name: MANAGEMENT
+    tag: snmp_acl_allow
+
+  # IOS only
+  views:
+    ro: ROview
+    rw: RWview
+  group_context:
+    enabled: true
+    prefix: "vlan-"
+
+  # IOS + NX-OS
+  groups:
+    ro: network-operator
+    rw: network-admin
+
+  users:
+    - username: ROuser
+      access: ro
+      auth_proto: sha
+      auth_pass: "password"
+      priv_proto: aes
+      priv_bits: 128
+      priv_pass: "password"
+    - username: RWuser
+      access: rw
+      auth_proto: sha
+      auth_pass: "password"
+      priv_proto: aes
+      priv_bits: 128
+      priv_pass: "password"
+    # - username: user1
+    #   access: rw
+    #   auth_proto: sha
+    #   auth_pass: "password"
+    #   priv_proto: aes
+    #   priv_bits: 128
+    #   priv_pass: "password"
+    #   host: 1.2.3.4        # optional trap/inform target
+    #   cisco_ise: true      # optional: sync these creds to Cisco ISE

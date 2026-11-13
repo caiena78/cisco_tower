@@ -1,0 +1,22 @@
+---
+# NX-OS shows the severity on each server line and hides the default port 514,
+# so lines are built that way to stay idempotent.
+- name: Build NX-OS syslog lines
+  ansible.builtin.set_fact:
+    cisco_syslog_lines: >-
+      {%- set l = ['logging origin-id string ' ~ cisco_syslog.origin_id_prefix ~ inventory_hostname] -%}
+      {%- set _ = l.append('logging level all ' ~ (cisco_syslog.level | int)) -%}
+      {%- if cisco_syslog_src_if != 'NOT_SET' -%}
+      {%- set _ = l.append('logging source-interface ' ~ cisco_syslog_src_if) -%}
+      {%- endif -%}
+      {%- for s in cisco_syslog_servers_final -%}
+      {%- set _ = l.append('logging server ' ~ s.ip ~ ' ' ~ (cisco_syslog.level | int)
+          ~ ((' port ' ~ s.port) if s.port != 514 else '')
+          ~ ((' use-vrf ' ~ cisco_syslog_vrf) if cisco_syslog_vrf != 'NOT_SET' else '')) -%}
+      {%- endfor -%}
+      {{ l }}
+
+- name: Configure syslog (NX-OS)
+  cisco.nxos.nxos_config:
+    lines: "{{ cisco_syslog_lines }}"
+    save_when: "{{ 'modified' if (network_save_config | bool) else 'never' }}"

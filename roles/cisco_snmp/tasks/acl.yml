@@ -1,0 +1,88 @@
+---
+# Management ACL built from NetBox IPs tagged <acl.tag>. Replaces the standalone caiena78/mgnt_acl role.
+# Standalone use:
+#   - ansible.builtin.include_role: {name: cisco_snmp, tasks_from: acl.yml}
+#     vars: {mgnt_acl: {name: MANAGEMENT, tag: snmp_acl_allow}}
+- name: Common setup
+  ansible.builtin.include_tasks: init.yml
+
+- name: Resolve ACL definition
+  ansible.builtin.set_fact:
+    cisco_snmp_acl_def: "{{ mgnt_acl | default(cisco_snmp.acl) }}"
+
+- name: Get IPs tagged {{ cisco_snmp_acl_def.tag }} from NetBox
+  ansible.builtin.uri:
+    url: "{{ netbox_url }}/api/ipam/ip-addresses/?tag={{ cisco_snmp_acl_def.tag }}&limit=1000"
+    method: GET
+    headers:
+      Authorization: "Token {{ netbox_token }}"
+      Accept: "application/json"
+    validate_certs: "{{ netbox_validate_certs }}"
+    return_content: true
+  delegate_to: localhost
+  register: cisco_snmp_acl_response
+  no_log: true
+  vars:
+    ansible_connection: local
+
+# A truncated list would lock management hosts out, so refuse instead of using page 1 only.
+- name: Refuse a truncated NetBox result
+  ansible.builtin.assert:
+    that: (cisco_snmp_acl_response.json.next | default(none)) is none
+    fail_msg: "NetBox returned more than 1000 addresses tagged {{ cisco_snmp_acl_def.tag }}; pagination not supported, ACL not changed"
+    quiet: true
+
+# IPv4 only: these are standard / ip ACLs. IPv6 addresses are skipped.
+- name: Extract IPv4 management addresses
+  ansible.builtin.set_fact:
+    cisco_snmp_acl_ips: >-
+      {{
+        cisco_snmp_acl_response.json.results
+        | map(attribute='address') | map('split', '/') | map('first')
+        | select('match', '^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+$')
+        | unique | list
+      }}
+
+# An empty IOS ACL denies everything and the NX-OS path deletes the ACL, so never apply an empty list.
+- name: Refuse an empty ACL
+  ansible.builtin.assert:
+    that: cisco_snmp_acl_ips | length > 0
+    fail_msg: "No IPv4 addresses tagged {{ cisco_snmp_acl_def.tag }} in NetBox; ACL {{ cisco_snmp_acl_def.name }} not changed"
+    quiet: true
+
+- name: Show ACL addresses
+  ansible.builtin.debug:
+    var: cisco_snmp_acl_ips
+  when: cisco_snmp_acl_debug | bool
+
+- name: Reset ACL state
+  ansible.builtin.set_fact:
+    cisco_snmp_acl_done: false
+
+- name: Apply ACL over NETCONF
+  when: network_transport == 'netconf'
+  block:
+    - name: Replace ACL (NETCONF)
+      ansible.netcommon.netconf_config:
+        content: "{{ lookup('ansible.builtin.template', 'netconf/' ~ cisco_snmp_os ~ '_acl.xml.j2') }}"
+      vars:
+        ansible_connection: ansible.netcommon.netconf
+        ansible_network_os: default
+        ansible_port: "{{ network_netconf_port }}"
+
+    - name: Mark ACL done
+      ansible.builtin.set_fact:
+        cisco_snmp_acl_done: true
+  rescue:
+    - name: NETCONF ACL failed
+      ansible.builtin.fail:
+        msg: "NETCONF ACL update failed and network_netconf_fallback_on_error is false: {{ ansible_failed_result.msg | default('') }}"
+      when: not (network_netconf_fallback_on_error | bool)
+
+    - name: Falling back to CLI for ACL
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: NETCONF ACL failed ({{ ansible_failed_result.msg | default('') | truncate(150) }}); using CLI"
+
+- name: Apply ACL over CLI
+  ansible.builtin.include_tasks: "acl_{{ cisco_snmp_os }}.yml"
+  when: not cisco_snmp_acl_done

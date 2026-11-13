@@ -1,0 +1,88 @@
+---
+- name: Enable TACACS+ feature
+  cisco.nxos.nxos_feature:
+    feature: tacacs+
+    state: enabled
+
+# Fix: LOCAL_ENABLE is no longer required (it was never used on NX-OS)
+- name: Configure local user
+  cisco.nxos.nxos_config:
+    lines:
+      - "username {{ cisco_aaa_local_user.username }} role {{ cisco_aaa.local_user.nxos_role }} password {{ cisco_aaa_local_user.password }}"
+    match: none
+  when:
+    - cisco_aaa_local_user.username | length > 0
+    - cisco_aaa_local_user.password | length > 0
+  no_log: "{{ not (cisco_aaa_debug | bool) }}"
+
+# The server is referenced by name; ip host maps the name to its address
+- name: Map server names to addresses
+  cisco.nxos.nxos_config:
+    lines: "{{ cisco_aaa_servers | map(attribute='name') | zip(cisco_aaa_servers | map(attribute='address')) | map('join', ' ') | map('regex_replace', '^', 'ip host ') | list }}"
+  when: cisco_aaa.nxos.use_ip_host | bool
+
+- name: Configure TACACS server hosts
+  cisco.nxos.nxos_aaa_server_host:
+    server_type: "{{ item.server_type }}"
+    address: "{{ item.name if (cisco_aaa.nxos.use_ip_host | bool) else item.address }}"
+    key: "{{ item.key }}"
+    encrypt_type: "{{ item.encrypt_type }}"
+    host_timeout: "{{ item.timeout }}"
+    tacacs_port: "{{ item.port }}"
+    state: present
+  loop: "{{ cisco_aaa_servers }}"
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: "{{ not (cisco_aaa_debug | bool) }}"
+
+# Fix: only when a management interface was found (it used to push "NOT_SET")
+- name: Set TACACS source interface
+  cisco.nxos.nxos_config:
+    lines:
+      - "ip tacacs source-interface {{ mgntINT }}"
+  when: mgntINT | default('NOT_SET') != 'NOT_SET'
+
+- name: Read current TACACS group
+  cisco.nxos.nxos_command:
+    commands:
+      - 'show running-config | section "aaa group server"'
+  register: cisco_aaa_nxos_group_raw
+
+- name: Plan group changes
+  ansible.builtin.set_fact:
+    cisco_aaa_nxos_members: "{{ cisco_aaa_servers | map(attribute='name' if (cisco_aaa.nxos.use_ip_host | bool) else 'address') | list }}"
+    cisco_aaa_nxos_existing: >-
+      {%- set ns = namespace(on=false, m=[]) -%}
+      {%- for l in cisco_aaa_nxos_group_raw.stdout[0].splitlines() -%}
+      {%- if l == 'aaa group server tacacs+ ' ~ cisco_aaa_group -%}{%- set ns.on = true -%}
+      {%- elif ns.on and not l.startswith(' ') -%}{%- set ns.on = false -%}
+      {%- elif ns.on and l.strip().startswith('server ') -%}{%- set ns.m = ns.m + [l.strip().split(' ')[1]] -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {{ ns.m }}
+
+- name: Remove servers not in the list
+  cisco.nxos.nxos_config:
+    parents: ["aaa group server tacacs+ {{ cisco_aaa_group }}"]
+    lines: "{{ cisco_aaa_nxos_existing | difference(cisco_aaa_nxos_members) | map('regex_replace', '^', 'no server ') | list }}"
+    match: none
+  when:
+    - cisco_aaa_cleanup_effective | bool
+    - (cisco_aaa_nxos_existing | difference(cisco_aaa_nxos_members)) | length > 0
+
+# Fix: use-vrf is now applied (the VRF was detected but never used); group name no longer hardcoded
+- name: Configure TACACS group
+  cisco.nxos.nxos_config:
+    parents: ["aaa group server tacacs+ {{ cisco_aaa_group }}"]
+    lines: >-
+      {{
+        (cisco_aaa_nxos_members | map('regex_replace', '^', 'server ') | list)
+        + (['use-vrf ' ~ vrf_name] if ((cisco_aaa.nxos.use_vrf | bool) and (vrf_name | default('NOT_SET')) != 'NOT_SET') else [])
+      }}
+
+- name: Configure AAA authentication
+  cisco.nxos.nxos_config:
+    lines:
+      - "aaa authentication login default group {{ cisco_aaa_group }}"
+      - "aaa authentication login console group {{ cisco_aaa_group }}"
+    save_when: "{{ 'modified' if (network_save_config | bool) else 'never' }}"

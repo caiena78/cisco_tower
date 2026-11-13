@@ -1,0 +1,43 @@
+---
+- name: Set ansible_network_os from NetBox
+  when: not (netbox_network_os_done | default(false) | bool)
+  block:
+    - name: Keep existing ansible_network_os
+      ansible.builtin.set_fact:
+        netbox_network_os_done: true
+      when:
+        - not (netbox_network_os_overwrite | bool)
+        - ansible_network_os is defined
+        - ansible_network_os | length > 0
+
+    - name: Look up and apply the platform
+      when: not (netbox_network_os_done | default(false) | bool)
+      block:
+        - name: Require NetBox connection settings
+          ansible.builtin.assert:
+            that:
+              - netbox_url | length > 0
+              - netbox_token | length > 0
+            fail_msg: >-
+              NetBox URL/token are empty. Export NETBOX_URL and NETBOX_API from Vault
+              (see .env: set -a; source .env; set +a) or set netbox_url / netbox_token.
+            quiet: true
+
+        - name: Get device from NetBox
+          ansible.builtin.uri:
+            url: "{{ netbox_url }}/api/dcim/devices/?name={{ netbox_network_os_device_name | urlencode }}"
+            method: GET
+            headers:
+              Authorization: "Token {{ netbox_token }}"
+              Accept: "application/json"
+            validate_certs: "{{ netbox_validate_certs | default(true) }}"
+            return_content: true
+          delegate_to: localhost
+          register: netbox_network_os_response
+          no_log: true
+          vars:
+            # Set as a var (not the connection: keyword) so group_vars ansible_connection=network_cli does not apply
+            ansible_connection: local
+
+        - name: Resolve and set ansible_network_os
+          ansible.builtin.include_tasks: resolve.yml

@@ -1,0 +1,36 @@
+---
+- name: Gather L3 interfaces (NX-OS)
+  cisco.nxos.nxos_facts:
+    gather_subset: min
+    gather_network_resources: l3_interfaces
+
+- name: Find the interface holding ansible_host
+  ansible.builtin.set_fact:
+    mgntINT: >-
+      {%- set ns = namespace(n='NOT_SET') -%}
+      {%- for i in (ansible_network_resources.l3_interfaces | default([])) -%}
+      {%- for a in (i.ipv4 | default([])) -%}
+      {%- if (a.address | default('')).split(' ')[0].split('/')[0] == ansible_host -%}{%- set ns.n = i.name -%}{%- endif -%}
+      {%- endfor -%}
+      {%- endfor -%}
+      {{ ns.n }}
+    vrf_name: NOT_SET
+
+- name: Read VRF of the management interface
+  cisco.nxos.nxos_command:
+    commands:
+      - "show running-config interface {{ mgntINT }}"
+  register: network_facts_mgmt_cfg
+  when: mgntINT != 'NOT_SET'
+
+- name: Set vrf_name
+  ansible.builtin.set_fact:
+    vrf_name: >-
+      {%- set m = (network_facts_mgmt_cfg.stdout[0] | default('')) | regex_search('(?m)^\s*vrf member (\S+)', '\1') -%}
+      {{ (m | first) if (m is not none and m | length > 0) else 'NOT_SET' }}
+  when: mgntINT != 'NOT_SET'
+
+- name: Show management interface
+  ansible.builtin.debug:
+    msg: "mgntINT={{ mgntINT }} vrf_name={{ vrf_name }}"
+  when: network_facts_debug | bool

@@ -1,0 +1,31 @@
+
+
+
+snmp playbooks
+https://github.com/caiena78/ansible_nxos_snmp
+https://github.com/caiena78/mgnt_acl
+https://github.com/caiena78/ios_snmp.git
+
+
+aaa playbooks
+https://github.com/caiena78/ios_aaa
+https://github.com/caiena78/ios_aaa_telnet
+https://github.com/caiena78/airos_aaa
+https://github.com/caiena78/nxos_aaa
+
+
+
+
+syslog
+https://github.com/caiena78/ios_syslog.git.
+https://github.com/caiena78/ansible_nxos_syslog.git.
+
+
+# ---------------------------------------------------------------------------
+# Consolidation map (roles/ in this repo)
+#   snmp   : ansible_nxos_snmp + mgnt_acl + Sapphire-Health/ansible-role-cisco-ios-snmp  -> roles/cisco_snmp
+#            (caiena78/ios_snmp does not exist; the IOS role is in the Sapphire-Health org)
+#   aaa    : ios_aaa + ios_aaa_telnet + nxos_aaa + airos_aaa (Cisco AireOS)               -> roles/cisco_aaa
+#   syslog : ios_syslog + ansible_nxos_syslog (the trailing ".git." above is a typo)       -> roles/cisco_syslog
+#   helpers: netbox_getsite + get_mgnt_vrf + ansible_ios_get_mgnt_vrf + nxos_get_mgnt_vrf  -> roles/network_facts
+# ---------------------------------------------------------------------------

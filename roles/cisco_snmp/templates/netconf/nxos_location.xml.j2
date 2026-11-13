@@ -1,0 +1,11 @@
+<config xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+  <System xmlns="http://cisco.com/ns/yang/cisco-nx-os-device">
+    <snmp-items>
+      <inst-items>
+        <sysinfo-items>
+          <sysLocation>{{ SNMP_LOCATION | e }}</sysLocation>
+        </sysinfo-items>
+      </inst-items>
+    </snmp-items>
+  </System>
+</config>

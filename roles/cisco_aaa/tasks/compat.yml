@@ -1,0 +1,57 @@
+---
+# Old variable names (tacacs, tacacspwd, tacacs_group_name, LOCAL_*, remove_undefined_servers, ISE_*)
+# still work: when one is set it is mapped onto the unified cisco_aaa structure, so existing
+# Tower surveys / inventory keep working during cutover. New names are preferred.
+- name: Build effective settings
+  ansible.builtin.set_fact:
+    cisco_aaa_group: "{{ tacacs_group_name | default(cisco_aaa.group_name) }}"
+    cisco_aaa_cleanup_effective: "{{ (remove_undefined_servers | default(cisco_aaa_cleanup)) | bool }}"
+    cisco_aaa_ise_secret: "{{ tacacspwd | default(cisco_aaa.ise.shared_secret if (cisco_aaa.ise.shared_secret | length > 0) else cisco_aaa.key) }}"
+    cisco_aaa_servers: >-
+      {%- set src = cisco_aaa.servers if (cisco_aaa.servers | length > 0) else (tacacs | default([])) -%}
+      {%- set out = [] -%}
+      {%- for s in src -%}
+      {%- set _ = out.append({
+          'name': s.name | default(s.address),
+          'address': s.address | default(s.name),
+          'key': s.key | default(cisco_aaa.key),
+          'timeout': (s.timeout | default(s.host_timeout | default(cisco_aaa.timeout))) | int,
+          'port': (s.port | default(cisco_aaa.port)) | int,
+          'server_type': s.server_type | default('tacacs'),
+          'encrypt_type': (s.encrypt_type | default(cisco_aaa.nxos.encrypt_type)) | int
+        }) -%}
+      {%- endfor -%}
+      {{ out }}
+    cisco_aaa_local_user: >-
+      {{
+        {
+          'username': (LOCAL_USER if (LOCAL_USER | default('NONE') != 'NONE') else cisco_aaa.local_user.username),
+          'password': (LOCAL_PWD if (LOCAL_PWD | default('NONE') != 'NONE') else cisco_aaa.local_user.password),
+          'enable_secret': (LOCAL_ENABLE if (LOCAL_ENABLE | default('NONE') != 'NONE') else cisco_aaa.local_user.enable_secret)
+        }
+      }}
+    cisco_aaa_ise_location: >-
+      {%- if ISE_LOCATION | default('NONE') != 'NONE' -%}{{ ISE_LOCATION }}
+      {%- elif cisco_aaa.ise.location | length > 0 -%}{{ cisco_aaa.ise.location }}
+      {%- elif netbox_site_response is defined and netbox_site_response.json is defined and netbox_site_response.json.custom_fields is defined
+               and (netbox_site_response.json.custom_fields.ISE_LOCATION | default('', true)) | length > 0 -%}
+      {{ netbox_site_response.json.custom_fields.ISE_LOCATION }}
+      {%- endif -%}
+    cisco_aaa_ise_device_type: "{{ ISE_DEVICE_TYPE | default(cisco_aaa.ise.device_type[cisco_aaa_os]) }}"
+    cisco_aaa_ise_device_name: "{{ ise_device_name | default(cisco_aaa.ise.device_name) }}"
+    cisco_aaa_ise_description: "{{ ISE_DESCRIPTION if (ISE_DESCRIPTION | default('NONE') != 'NONE') else cisco_aaa.ise.description }}"
+    cisco_aaa_ise_skip_log: "{{ ise_skip_log_file | default(cisco_aaa.ise.skip_log_file) }}"
+  no_log: "{{ not (cisco_aaa_debug | bool) }}"
+
+- name: Require at least one TACACS server
+  ansible.builtin.assert:
+    that: cisco_aaa_servers | length > 0
+    fail_msg: "No TACACS servers: set cisco_aaa.servers (or legacy 'tacacs')"
+    quiet: true
+
+- name: Require a key for every server
+  ansible.builtin.assert:
+    that: cisco_aaa_servers | selectattr('key', 'ne', '') | list | length == cisco_aaa_servers | length
+    fail_msg: "Every TACACS server needs a key: set cisco_aaa.key or a per-server key"
+    quiet: true
+  no_log: true

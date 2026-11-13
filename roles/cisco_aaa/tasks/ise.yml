@@ -1,0 +1,180 @@
+---
+# One ISE sync for all platforms (replaces the 4 copy-pasted blocks, using the newer Device-Type-aware logic).
+# 1. find the device by IP, else by name
+# 2. found     -> PUT new TACACS shared secret (+ device type group; + new IP when matched by name)
+# 3. not found -> POST a new device (location from NetBox ISE_LOCATION) and log it
+- name: Require ISE connection settings
+  ansible.builtin.assert:
+    that:
+      - ise_hostname is defined
+      - ise_username is defined
+      - ise_password is defined
+    fail_msg: "ISE sync is on but ise_hostname / ise_username / ise_password are not set (use Vault), or set cisco_aaa_ise_enabled: false"
+    quiet: true
+
+- name: Set ISE API base
+  ansible.builtin.set_fact:
+    cisco_aaa_ise_base: "https://{{ ise_hostname }}:{{ ise_port | default(9060) }}/ers/config/networkdevice"
+
+- name: Find device in ISE by IP
+  ansible.builtin.uri:
+    url: "{{ cisco_aaa_ise_base }}?filter=ipaddress.EQ.{{ ansible_host }}"
+    method: GET
+    url_username: "{{ ise_username }}"
+    url_password: "{{ ise_password }}"
+    force_basic_auth: true
+    validate_certs: "{{ ise_verify | default(false) }}"
+    headers:
+      Accept: "application/json"
+    status_code: 200
+  register: cisco_aaa_ise_by_ip
+  delegate_to: localhost
+  no_log: true
+  vars:
+    ansible_connection: local
+
+- name: Find device in ISE by name
+  ansible.builtin.uri:
+    url: "{{ cisco_aaa_ise_base }}?filter=name.EQ.{{ cisco_aaa_ise_device_name }}"
+    method: GET
+    url_username: "{{ ise_username }}"
+    url_password: "{{ ise_password }}"
+    force_basic_auth: true
+    validate_certs: "{{ ise_verify | default(false) }}"
+    headers:
+      Accept: "application/json"
+    status_code: 200
+  register: cisco_aaa_ise_by_name
+  delegate_to: localhost
+  no_log: true
+  vars:
+    ansible_connection: local
+  when: cisco_aaa_ise_by_ip.json.SearchResult.total | int == 0
+
+- name: Work out which ISE record matched
+  ansible.builtin.set_fact:
+    cisco_aaa_ise_match: >-
+      {%- if cisco_aaa_ise_by_ip.json.SearchResult.total | int > 0 -%}
+      {{ {'id': cisco_aaa_ise_by_ip.json.SearchResult.resources[0].id, 'by': 'ip'} }}
+      {%- elif cisco_aaa_ise_by_name.json.SearchResult.total | default(0) | int > 0 -%}
+      {{ {'id': cisco_aaa_ise_by_name.json.SearchResult.resources[0].id, 'by': 'name'} }}
+      {%- else -%}
+      {{ {'id': '', 'by': 'none'} }}
+      {%- endif -%}
+
+- name: Update existing ISE device
+  when: cisco_aaa_ise_match.id | length > 0
+  block:
+    - name: Get ISE device record
+      ansible.builtin.uri:
+        url: "{{ cisco_aaa_ise_base }}/{{ cisco_aaa_ise_match.id }}"
+        method: GET
+        url_username: "{{ ise_username }}"
+        url_password: "{{ ise_password }}"
+        force_basic_auth: true
+        validate_certs: "{{ ise_verify | default(false) }}"
+        headers:
+          Accept: "application/json"
+        status_code: 200
+      register: cisco_aaa_ise_device
+      delegate_to: localhost
+      no_log: true
+      vars:
+        ansible_connection: local
+
+    - name: Build updated ISE device
+      ansible.builtin.set_fact:
+        cisco_aaa_ise_updated: >-
+          {{
+            cisco_aaa_ise_device.json.NetworkDevice
+            | combine({
+                'tacacsSettings': (cisco_aaa_ise_device.json.NetworkDevice.tacacsSettings | default({'connectModeOptions': 'OFF'}))
+                                  | combine({'sharedSecret': cisco_aaa_ise_secret, 'previousSharedSecret': cisco_aaa_ise_secret}),
+                'NetworkDeviceGroupList': (cisco_aaa_ise_device.json.NetworkDevice.NetworkDeviceGroupList | default([])
+                                           | reject('match', '^Device Type#') | list) + [cisco_aaa_ise_device_type]
+              })
+            | combine({'NetworkDeviceIPList': [{'ipaddress': ansible_host, 'mask': 32}]} if cisco_aaa_ise_match.by == 'name' else {})
+          }}
+      no_log: true
+
+    - name: Push updated device to ISE
+      ansible.builtin.uri:
+        url: "{{ cisco_aaa_ise_base }}/{{ cisco_aaa_ise_match.id }}"
+        method: PUT
+        url_username: "{{ ise_username }}"
+        url_password: "{{ ise_password }}"
+        force_basic_auth: true
+        validate_certs: "{{ ise_verify | default(false) }}"
+        headers:
+          Content-Type: "application/json"
+          Accept: "application/json"
+        body_format: json
+        body:
+          NetworkDevice: "{{ cisco_aaa_ise_updated }}"
+        status_code: [200, 201]
+      delegate_to: localhost
+      no_log: true
+      vars:
+        ansible_connection: local
+
+- name: Create missing ISE device
+  when: cisco_aaa_ise_match.id | length == 0
+  block:
+    - name: Build new ISE device
+      ansible.builtin.set_fact:
+        cisco_aaa_ise_new:
+          name: "{{ cisco_aaa_ise_device_name }}"
+          description: "{{ cisco_aaa_ise_description }}"
+          profileName: Cisco
+          coaPort: 1700
+          NetworkDeviceIPList:
+            - ipaddress: "{{ ansible_host }}"
+              mask: 32
+          NetworkDeviceGroupList:
+            - "{{ 'Location#All Locations#' ~ cisco_aaa_ise_location if cisco_aaa_ise_location | length > 0 else 'Location#All Locations' }}"
+            - "IPSEC#Is IPSEC Device#No"
+            - "{{ cisco_aaa_ise_device_type }}"
+          tacacsSettings:
+            sharedSecret: "{{ cisco_aaa_ise_secret }}"
+            connectModeOptions: "OFF"
+      no_log: true
+
+    - name: Create device in ISE
+      ansible.builtin.uri:
+        url: "{{ cisco_aaa_ise_base }}"
+        method: POST
+        url_username: "{{ ise_username }}"
+        url_password: "{{ ise_password }}"
+        force_basic_auth: true
+        validate_certs: "{{ ise_verify | default(false) }}"
+        headers:
+          Content-Type: "application/json"
+          Accept: "application/json"
+        body_format: json
+        body:
+          NetworkDevice: "{{ cisco_aaa_ise_new }}"
+        status_code: [200, 201]
+      delegate_to: localhost
+      no_log: true
+      vars:
+        ansible_connection: local
+
+    - name: Ensure ISE log directory exists
+      ansible.builtin.file:
+        path: "{{ cisco_aaa_ise_skip_log | dirname }}"
+        state: directory
+        mode: "0755"
+      delegate_to: localhost
+      run_once: true
+      vars:
+        ansible_connection: local
+
+    - name: Log device created in ISE
+      ansible.builtin.lineinfile:
+        path: "{{ cisco_aaa_ise_skip_log }}"
+        line: "{{ lookup('ansible.builtin.pipe', 'date -u +%FT%TZ') }} {{ inventory_hostname }} ({{ ansible_host }}) not found in ISE; created"
+        create: true
+        mode: "0644"
+      delegate_to: localhost
+      vars:
+        ansible_connection: local

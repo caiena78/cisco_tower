@@ -1,0 +1,135 @@
+---
+# Cisco NX-OS SNMPv3
+- name: Set SNMP globalEnforcePriv
+  cisco.nxos.nxos_config:
+    lines:
+      - "snmp-server globalEnforcePriv"
+  ignore_errors: true
+
+# access selects the group (ro/rw); AES uses bits, e.g. aes-128
+- name: Configure SNMPv3 users
+  cisco.nxos.nxos_config:
+    lines:
+      - >-
+        snmp-server user {{ item.username }}
+        {{ cisco_snmp.groups[item.access] }}
+        auth {{ item.auth_proto | lower }} {{ item.auth_pass }}
+        priv {{
+          ((item.priv_proto | lower) ~ '-' ~ (item.priv_bits | default(128) | string))
+          if (item.priv_proto | lower) == 'aes'
+          else (item.priv_proto | lower)
+        }} {{ item.priv_pass }}
+  loop: "{{ cisco_snmp.users }}"
+  loop_control:
+    label: "{{ item.username }} ({{ item.access }})"
+  no_log: true
+  ignore_errors: true
+
+- name: Apply IPv4 ACL to each SNMP user
+  cisco.nxos.nxos_config:
+    lines:
+      - "snmp-server user {{ item.username }} use-ipv4acl {{ cisco_snmp.acl.name }}"
+    match: line
+  loop: "{{ cisco_snmp.users }}"
+  loop_control:
+    label: "{{ item.username }}"
+  ignore_errors: true
+
+# Trap/inform destinations, not polling permission
+- name: Configure SNMP host targets (optional per-user)
+  cisco.nxos.nxos_config:
+    lines:
+      - "snmp-server host {{ item.host }} version 3 priv {{ item.username }}"
+    match: line
+  loop: "{{ cisco_snmp.users }}"
+  loop_control:
+    label: "{{ item.username }}"
+  when: item.host | default('') | string | length > 0
+  ignore_errors: true
+
+- name: Set SNMP user admin ACL
+  cisco.nxos.nxos_config:
+    lines:
+      - "snmp-server user admin use-ipv4acl {{ cisco_snmp.acl.name }}"
+    match: line
+  ignore_errors: true
+
+# ---- Cleanup: remove SNMPv3 users NOT in cisco_snmp.users ----
+- name: Cleanup stale SNMPv3 users and hosts
+  when: cisco_snmp_cleanup | bool
+  block:
+    - name: Cleanup | Gather SNMP users and running SNMP config
+      cisco.nxos.nxos_command:
+        commands:
+          - "show snmp user"
+          - "show running-config snmp"
+      register: snmp_cfg_raw
+
+    # Rows of the "SNMP USERS" table: start in column 0, skip header row,
+    # stop at the "NOTIFICATION TARGET USERS" section.
+    - name: Cleanup | Parse existing users and host lines
+      ansible.builtin.set_fact:
+        existing_snmp_usernames: >-
+          {%- set ns = namespace(on=false, names=[]) -%}
+          {%- for l in (snmp_cfg_raw.stdout_lines[0] | default([])) -%}
+          {%- if 'NOTIFICATION TARGET USERS' in l -%}{%- set ns.on = false -%}
+          {%- elif 'SNMP USERS' in l -%}{%- set ns.on = true -%}
+          {%- elif ns.on and l is match('^[A-Za-z0-9]') and not (l is match('^User ')) -%}
+          {%- set ns.names = ns.names + [l.split()[0]] -%}
+          {%- endif -%}
+          {%- endfor -%}
+          {{ ns.names | unique | list }}
+        existing_snmp_host_lines: >-
+          {{
+            (snmp_cfg_raw.stdout_lines[1] | default([]))
+            | map('trim')
+            | select('match', '^snmp-server host ')
+            | list
+          }}
+
+    - name: Cleanup | Compute users to remove
+      ansible.builtin.set_fact:
+        snmp_users_to_remove: >-
+          {{
+            existing_snmp_usernames
+            | difference(cisco_snmp.users | map(attribute='username') | list)
+            | difference(cisco_snmp_protected_users)
+          }}
+
+    - name: Cleanup | Show plan
+      ansible.builtin.debug:
+        msg:
+          - "Existing: {{ existing_snmp_usernames }}"
+          - "Protected: {{ cisco_snmp_protected_users }}"
+          - "To remove: {{ snmp_users_to_remove }}"
+
+    - name: Cleanup | Remove hosts then users
+      when: snmp_users_to_remove | length > 0
+      block:
+        - name: Cleanup | Remove host statements referencing removed users
+          cisco.nxos.nxos_config:
+            lines: >-
+              {{
+                existing_snmp_host_lines
+                | select('search', ' (' ~ (snmp_users_to_remove | map('regex_escape') | join('|')) ~ ')$')
+                | map('regex_replace', '^', 'no ')
+                | list
+              }}
+            match: none
+
+        # Username only: safest on NX-OS, avoids 'remove last group' errors
+        - name: Cleanup | Remove unused SNMPv3 users
+          cisco.nxos.nxos_config:
+            lines: "{{ snmp_users_to_remove | map('regex_replace', '^', 'no snmp-server user ') | list }}"
+            match: none
+          ignore_errors: true
+
+        - name: Cleanup | Verify
+          cisco.nxos.nxos_command:
+            commands:
+              - "show snmp user"
+          register: snmp_users_after
+
+        - name: Cleanup | Post-check
+          ansible.builtin.debug:
+            var: snmp_users_after.stdout_lines[0]

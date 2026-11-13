@@ -1,0 +1,9 @@
+---
+collections:
+  - name: cisco.ios
+  - name: cisco.nxos
+  - name: ansible.netcommon
+  - name: ansible.utils
+  - name: community.network   # AireOS (cisco_aaa)
+  - name: netbox.netbox       # dynamic inventory (netbox_inventory.yml)
+# Execution environment python packages (NETCONF): ncclient, xmltodict

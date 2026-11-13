@@ -1,0 +1,77 @@
+---
+# Decide network_transport: netconf | cli
+#   network_transport_reason explains why (printed in the summary below).
+- name: Default to CLI
+  ansible.builtin.set_fact:
+    network_transport: cli
+    network_transport_reason: "not eligible for NETCONF ({{ network_platform }})"
+
+- name: Honor forced CLI
+  ansible.builtin.set_fact:
+    network_transport_reason: "forced by network_transport_preference=cli"
+  when: network_transport_preference == 'cli'
+
+- name: Probe NETCONF
+  when:
+    - network_transport_preference in ['auto', 'netconf']
+    - network_platform in ['ios', 'nxos']
+  block:
+    - name: Probe NETCONF TCP port
+      ansible.builtin.wait_for:
+        host: "{{ ansible_host | default(inventory_hostname) }}"
+        port: "{{ network_netconf_port }}"
+        timeout: "{{ network_netconf_probe_timeout }}"
+        state: started
+      delegate_to: localhost
+      register: network_netconf_port_probe
+      failed_when: false   # a closed port is an expected answer, not an error ('msg' is set when the wait failed)
+      vars:
+        # Set as a var (not the connection: keyword) so group_vars ansible_connection=network_cli does not apply
+        ansible_connection: local
+
+    - name: Record closed port
+      ansible.builtin.set_fact:
+        network_transport_reason: "tcp/{{ network_netconf_port }} not reachable"
+      when: network_netconf_port_probe.msg is defined
+
+    # An open port is not enough: open a NETCONF session and read one leaf from the
+    # platform's YANG model. Success proves auth works and the model is present.
+    - name: Verify NETCONF session and YANG model
+      when: network_netconf_port_probe.msg is not defined
+      block:
+        - name: Read a leaf from the device model over NETCONF
+          ansible.netcommon.netconf_get:
+            source: running
+            filter: "{{ network_netconf_probe_filter[network_platform] }}"
+            display: xml
+          register: network_netconf_session
+          vars:
+            ansible_connection: ansible.netcommon.netconf
+            ansible_network_os: default
+            ansible_port: "{{ network_netconf_port }}"
+
+        - name: Accept NETCONF
+          ansible.builtin.set_fact:
+            network_transport: netconf
+            network_transport_reason: "NETCONF session ok, {{ network_netconf_probe_namespace[network_platform] | basename }} model present"
+          when: network_netconf_session.stdout | default('') is search(network_netconf_probe_namespace[network_platform])
+
+        - name: Record missing model
+          ansible.builtin.set_fact:
+            network_transport_reason: "NETCONF session ok but {{ network_netconf_probe_namespace[network_platform] | basename }} model not returned"
+          when: network_netconf_session.stdout | default('') is not search(network_netconf_probe_namespace[network_platform])
+      rescue:
+        - name: Record failed NETCONF session
+          ansible.builtin.set_fact:
+            network_transport_reason: "NETCONF session failed ({{ ansible_failed_result.msg | default('unknown') | truncate(120) }})"
+
+- name: Fail when NETCONF is required but unusable
+  ansible.builtin.fail:
+    msg: "network_transport_preference=netconf but {{ network_transport_reason }}"
+  when:
+    - network_transport_preference == 'netconf'
+    - network_transport != 'netconf'
+
+- name: Transport summary
+  ansible.builtin.debug:
+    msg: "{{ inventory_hostname }}: transport={{ network_transport }} ({{ network_transport_reason }})"

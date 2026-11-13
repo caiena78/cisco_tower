@@ -1,0 +1,12 @@
+---
+# Site lookup itself is done by network_facts (init.yml) and registers netbox_site_response.
+- name: Set SNMP location fact from NetBox custom field
+  ansible.builtin.set_fact:
+    SNMP_LOCATION: "{{ netbox_site_response.json.custom_fields.SNMP_LOCATION }}"
+  when:
+    - netbox_site_response is defined
+    - netbox_site_response.json is defined
+    - netbox_site_response.json | length > 0
+    - netbox_site_response.json.custom_fields is defined
+    - netbox_site_response.json.custom_fields.SNMP_LOCATION is defined
+    - netbox_site_response.json.custom_fields.SNMP_LOCATION | length > 0

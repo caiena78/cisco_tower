@@ -1,0 +1,70 @@
+---
+# Replaces caiena78/netbox_getsite. Registers netbox_site_response (same name callers already use).
+# Fix vs original: the most specific prefix is chosen by prefix LENGTH, not by string sort.
+- name: Look up exact /32 prefix in NetBox
+  ansible.builtin.uri:
+    url: "{{ netbox_url }}/api/ipam/prefixes/?prefix={{ ansible_host }}/32"
+    method: GET
+    headers:
+      Authorization: "Token {{ netbox_token }}"
+      Accept: "application/json"
+    validate_certs: "{{ netbox_validate_certs }}"
+    return_content: true
+  delegate_to: localhost
+  register: network_facts_prefix_exact
+  no_log: true
+  vars:
+    ansible_connection: local
+
+- name: Look up containing prefixes in NetBox
+  ansible.builtin.uri:
+    url: "{{ netbox_url }}/api/ipam/prefixes/?contains={{ ansible_host }}&limit=0"
+    method: GET
+    headers:
+      Authorization: "Token {{ netbox_token }}"
+      Accept: "application/json"
+    validate_certs: "{{ netbox_validate_certs }}"
+    return_content: true
+  delegate_to: localhost
+  register: network_facts_prefix_contains
+  no_log: true
+  vars:
+    ansible_connection: local
+  when: network_facts_prefix_exact.json.count | default(0) | int == 0
+
+- name: Pick the most specific prefix and its site URL
+  ansible.builtin.set_fact:
+    network_facts_site_url: >-
+      {%- set results = (network_facts_prefix_exact.json.results | default([]))
+          if (network_facts_prefix_exact.json.count | default(0) | int > 0)
+          else (network_facts_prefix_contains.json.results | default([])) -%}
+      {%- set ns = namespace(url='', len=-1) -%}
+      {%- for p in results -%}
+      {%- set plen = p.prefix.split('/')[1] | int -%}
+      {%- set u = (p.scope.url | default('')) if (p.scope is defined and p.scope) else ((p.site.url | default('')) if (p.site is defined and p.site) else '') -%}
+      {%- if u | length > 0 and plen > ns.len -%}
+      {%- set ns.url = u -%}{%- set ns.len = plen -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {{ ns.url }}
+
+- name: Get NetBox site
+  ansible.builtin.uri:
+    url: "{{ network_facts_site_url }}"
+    method: GET
+    headers:
+      Authorization: "Token {{ netbox_token }}"
+      Accept: "application/json"
+    validate_certs: "{{ netbox_validate_certs }}"
+    return_content: true
+  delegate_to: localhost
+  register: netbox_site_response
+  no_log: true
+  vars:
+    ansible_connection: local
+  when: network_facts_site_url | length > 0
+
+- name: Warn when no NetBox site found
+  ansible.builtin.debug:
+    msg: "{{ ansible_host }}: no NetBox prefix with a site found; site-based values (SNMP_LOCATION, syslog servers, ISE location) unavailable"
+  when: network_facts_site_url | length == 0

@@ -1,0 +1,66 @@
+---
+- name: Gather shared network facts (platform, NetBox site, mgmt VRF)
+  ansible.builtin.include_role:
+    name: network_facts
+  vars:
+    network_platform_override: "{{ cisco_aaa_platform }}"
+    network_facts_netbox_enabled: "{{ cisco_aaa_netbox_enabled }}"
+  when: cisco_aaa_transport != 'telnet'
+
+# Telnet-only devices: no SSH, so no CLI-based management detection (done over telnet below)
+- name: Gather shared network facts (telnet device)
+  ansible.builtin.include_role:
+    name: network_facts
+  vars:
+    network_platform_override: "{{ cisco_aaa_platform }}"
+    network_facts_netbox_enabled: "{{ cisco_aaa_netbox_enabled }}"
+    network_facts_mgmt_enabled: false
+    network_transport_preference: cli
+  when: cisco_aaa_transport == 'telnet'
+
+- name: Set platform
+  ansible.builtin.set_fact:
+    cisco_aaa_os: "{{ network_platform }}"
+
+- name: Validate platform and transport
+  ansible.builtin.assert:
+    that:
+      - cisco_aaa_os in ['ios', 'nxos', 'aireos']
+      - cisco_aaa_transport in ['ssh', 'telnet']
+      - cisco_aaa_transport == 'ssh' or cisco_aaa_os == 'ios'
+    fail_msg: "cisco_aaa: platform must be ios/nxos/aireos (got '{{ cisco_aaa_os }}'); telnet transport is IOS only"
+    quiet: true
+
+- name: Show cisco_aaa role version
+  ansible.builtin.debug:
+    msg: "cisco_aaa role version {{ cisco_aaa_version }} ({{ cisco_aaa_os }}, {{ cisco_aaa_transport }})"
+
+- name: Map legacy variables and build effective settings
+  ansible.builtin.include_tasks: compat.yml
+
+# Telnet devices: read interfaces/hostname first so ISE can match by hostname and VRF is known
+- name: Read telnet device state
+  ansible.builtin.include_tasks: ios_telnet_gather.yml
+  when: cisco_aaa_transport == 'telnet'
+
+- name: Sync TACACS shared secret and device type to Cisco ISE
+  ansible.builtin.include_tasks: ise.yml
+  when:
+    - cisco_aaa_ise_enabled | bool
+    - cisco_aaa_ise_secret | length > 0
+
+- name: Configure AAA on IOS / IOS-XE over SSH
+  ansible.builtin.include_tasks: ios.yml
+  when: cisco_aaa_os == 'ios' and cisco_aaa_transport == 'ssh'
+
+- name: Configure AAA on IOS over telnet
+  ansible.builtin.include_tasks: ios_telnet.yml
+  when: cisco_aaa_os == 'ios' and cisco_aaa_transport == 'telnet'
+
+- name: Configure AAA on NX-OS
+  ansible.builtin.include_tasks: nxos.yml
+  when: cisco_aaa_os == 'nxos'
+
+- name: Configure AAA on AireOS WLC
+  ansible.builtin.include_tasks: aireos.yml
+  when: cisco_aaa_os == 'aireos'

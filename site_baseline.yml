@@ -1,0 +1,25 @@
+---
+# Management baseline for Cisco devices from the NetBox inventory.
+# NetBox URL/token come from the environment (NETBOX_URL / NETBOX_API, populated from Vault - see .env).
+# network_facts goes first so platform, NETCONF/CLI transport, NetBox site and management VRF are
+# decided once per host.
+#
+#   ansible-playbook -i netbox_inventory.yml site_baseline.yml --limit <host> --check --diff
+#   ansible-playbook -i netbox_inventory.yml site_baseline.yml --tags syslog
+#
+# Secrets (cisco_aaa.key, ise_password, SNMP user passwords, ...) belong in Ansible Vault / Tower credentials.
+- name: Cisco management baseline
+  hosts: all
+  gather_facts: false
+  roles:
+    # ansible_network_os from the NetBox platform; must run before anything that connects
+    - role: netbox_network_os
+      tags: [always]
+    - role: network_facts
+      tags: [always]
+    - role: cisco_snmp
+      tags: [snmp]
+    - role: cisco_aaa
+      tags: [aaa]
+    - role: cisco_syslog
+      tags: [syslog]

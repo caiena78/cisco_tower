@@ -1,0 +1,19 @@
+---
+- name: Determine platform
+  ansible.builtin.set_fact:
+    network_platform: >-
+      {%- if network_platform_override | length > 0 -%}
+      {{ network_platform_override }}
+      {%- elif 'nxos' in (ansible_network_os | default('') | lower) -%}
+      nxos
+      {%- elif 'aireos' in (ansible_network_os | default('') | lower) -%}
+      aireos
+      {%- else -%}
+      ios
+      {%- endif -%}
+
+- name: Validate platform
+  ansible.builtin.assert:
+    that: network_platform in ['ios', 'nxos', 'aireos']
+    fail_msg: "network_platform must be ios, nxos or aireos (got '{{ network_platform }}')"
+    quiet: true

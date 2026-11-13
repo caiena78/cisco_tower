@@ -1,0 +1,27 @@
+{# Replaces the whole ACL in one edit-config (DME ACL-list). #}
+<config xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+  <System xmlns="http://cisco.com/ns/yang/cisco-nx-os-device">
+    <acl-items>
+      <ipv4-items>
+        <name-items>
+          <ACL-list nc:operation="replace">
+            <name>{{ cisco_snmp_acl_def.name | e }}</name>
+            <seq-items>
+{% for ip in cisco_snmp_acl_ips %}
+              <ACE-list>
+                <seqNum>{{ (loop.index * 10) }}</seqNum>
+                <action>permit</action>
+                <protocol>ip</protocol>
+                <srcPrefix>{{ ip }}</srcPrefix>
+                <srcPrefixLength>32</srcPrefixLength>
+                <dstPrefix>0.0.0.0</dstPrefix>
+                <dstPrefixLength>0</dstPrefixLength>
+              </ACE-list>
+{% endfor %}
+            </seq-items>
+          </ACL-list>
+        </name-items>
+      </ipv4-items>
+    </acl-items>
+  </System>
+</config>

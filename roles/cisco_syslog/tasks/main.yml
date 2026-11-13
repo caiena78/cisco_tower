@@ -1,0 +1,32 @@
+---
+- name: Gather shared network facts (platform, transport, NetBox site, mgmt VRF)
+  ansible.builtin.include_role:
+    name: network_facts
+  vars:
+    network_platform_override: "{{ cisco_syslog_platform }}"
+    network_facts_netbox_enabled: "{{ cisco_syslog_netbox_enabled }}"
+
+- name: Set platform
+  ansible.builtin.set_fact:
+    cisco_syslog_os: "{{ network_platform }}"
+
+- name: Validate platform
+  ansible.builtin.assert:
+    that: cisco_syslog_os in ['ios', 'nxos']
+    fail_msg: "cisco_syslog supports ios and nxos only (got '{{ cisco_syslog_os }}')"
+    quiet: true
+
+- name: Show cisco_syslog role version
+  ansible.builtin.debug:
+    msg: "cisco_syslog role version {{ cisco_syslog_version }} ({{ cisco_syslog_os }})"
+
+- name: Resolve servers, source interface and VRF
+  ansible.builtin.include_tasks: servers.yml
+
+- name: Configure syslog on IOS / IOS-XE
+  ansible.builtin.include_tasks: ios.yml
+  when: cisco_syslog_os == 'ios'
+
+- name: Configure syslog on NX-OS
+  ansible.builtin.include_tasks: nxos.yml
+  when: cisco_syslog_os == 'nxos'

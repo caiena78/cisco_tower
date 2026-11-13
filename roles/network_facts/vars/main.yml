@@ -1,0 +1,10 @@
+---
+network_netconf_probe_namespace:
+  ios: "http://cisco.com/ns/yang/Cisco-IOS-XE-native"
+  nxos: "http://cisco.com/ns/yang/cisco-nx-os-device"
+
+network_netconf_probe_filter:
+  ios: |
+    <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native"><hostname/></native>
+  nxos: |
+    <System xmlns="http://cisco.com/ns/yang/cisco-nx-os-device"><name/></System>

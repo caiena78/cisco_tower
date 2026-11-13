@@ -1,0 +1,102 @@
+---
+# Cisco AireOS WLC (community.network.aireos_*). Needs ansible_network_os=community.network.aireos, network_cli.
+- name: Warn about servers beyond the controller limit
+  ansible.builtin.debug:
+    msg: "AireOS supports {{ cisco_aaa.aireos.max_servers }} TACACS servers; ignoring {{ cisco_aaa_servers[cisco_aaa.aireos.max_servers:] | map(attribute='name') | list }}"
+  when: cisco_aaa_servers | length > cisco_aaa.aireos.max_servers
+
+- name: Read current mgmt users and TACACS servers
+  community.network.aireos_command:
+    commands:
+      - show mgmtuser
+      - show tacacs summary
+  register: cisco_aaa_aireos_state
+
+- name: Plan changes
+  ansible.builtin.set_fact:
+    # {auth: {'1': {addr, state}}, athr: {...}, acct: {...}} parsed from "show tacacs summary"
+    cisco_aaa_aireos_current: >-
+      {%- set ns = namespace(sec='', d={'auth': {}, 'athr': {}, 'acct': {}}) -%}
+      {%- for l in cisco_aaa_aireos_state.stdout[1].splitlines() -%}
+      {%- if l.strip().startswith('Authentication Servers') -%}{%- set ns.sec = 'auth' -%}
+      {%- elif l.strip().startswith('Authorization Servers') -%}{%- set ns.sec = 'athr' -%}
+      {%- elif l.strip().startswith('Accounting Servers') -%}{%- set ns.sec = 'acct' -%}
+      {%- elif ns.sec != '' -%}
+      {%- set m = l.split() -%}
+      {%- if m | length >= 4 and m[0].isdigit() and m[1].count('.') == 3 -%}
+      {%- set _ = ns.d[ns.sec].update({m[0]: {'addr': m[1], 'state': m[3]}}) -%}
+      {%- endif -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {{ ns.d }}
+    cisco_aaa_aireos_user_exists: >-
+      {{ cisco_aaa_local_user.username | length > 0 and
+         (cisco_aaa_aireos_state.stdout[0].splitlines() | select('match', '^' ~ (cisco_aaa_local_user.username | regex_escape) ~ '(\s|$)') | list | length > 0) }}
+
+# Fix: slots are only changed when they differ (the old role deleted and re-added all of them every run).
+# Keys cannot be read back, so a changed key alone is not detected: set cisco_aaa.aireos.force_rewrite: true.
+- name: Work out delete and add commands
+  ansible.builtin.set_fact:
+    cisco_aaa_aireos_deletes: >-
+      {%- set out = [] -%}
+      {%- set srv = cisco_aaa_servers[:cisco_aaa.aireos.max_servers] -%}
+      {%- for t in ['auth', 'acct', 'athr'] -%}
+      {%- for i in range(1, cisco_aaa.aireos.max_servers + 1) -%}
+      {%- set cur = cisco_aaa_aireos_current[t].get(i | string) -%}
+      {%- if cur is not none -%}
+      {%- set want = srv[i - 1] if i <= srv | length else none -%}
+      {%- if (want is none and cisco_aaa_cleanup_effective | bool)
+             or (want is not none and (cisco_aaa.aireos.force_rewrite | bool or cur.addr != want.address or cur.state != 'Enabled')) -%}
+      {%- set _ = out.append('tacacs ' ~ t ~ ' delete ' ~ i) -%}
+      {%- endif -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {%- endfor -%}
+      {{ out }}
+    cisco_aaa_aireos_adds: >-
+      {%- set out = [] -%}
+      {%- set srv = cisco_aaa_servers[:cisco_aaa.aireos.max_servers] -%}
+      {%- for t in ['auth', 'acct', 'athr'] -%}
+      {%- for s in srv -%}
+      {%- set i = loop.index -%}
+      {%- set cur = cisco_aaa_aireos_current[t].get(i | string) -%}
+      {%- if cisco_aaa.aireos.force_rewrite | bool or cur is none or cur.addr != s.address or cur.state != 'Enabled' -%}
+      {%- set _ = out.append('tacacs ' ~ t ~ ' add ' ~ i ~ ' ' ~ s.address ~ ' ' ~ s.port ~ ' ascii ' ~ s.key) -%}
+      {%- set _ = out.append('tacacs ' ~ t ~ ' enable ' ~ i) -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {%- endfor -%}
+      {{ out }}
+  no_log: "{{ not (cisco_aaa_debug | bool) }}"
+
+- name: Delete changed or stale TACACS slots
+  community.network.aireos_config:
+    lines: "{{ cisco_aaa_aireos_deletes }}"
+    match: none
+  when: cisco_aaa_aireos_deletes | length > 0
+  ignore_errors: true
+
+- name: Add TACACS servers
+  community.network.aireos_config:
+    lines: "{{ cisco_aaa_aireos_adds }}"
+    match: none
+  when: cisco_aaa_aireos_adds | length > 0
+  no_log: "{{ not (cisco_aaa_debug | bool) }}"
+
+# Fix: skipped when the user already exists (mgmtuser add errors on an existing user)
+- name: Add local management user
+  community.network.aireos_config:
+    lines:
+      - "mgmtuser add {{ cisco_aaa_local_user.username }} {{ cisco_aaa_local_user.password }} {{ cisco_aaa.local_user.aireos_access }}"
+    match: none
+  when:
+    - cisco_aaa_local_user.username | length > 0
+    - cisco_aaa_local_user.password | length > 0
+    - not (cisco_aaa_aireos_user_exists | bool)
+  no_log: "{{ not (cisco_aaa_debug | bool) }}"
+
+- name: Use TACACS for management authentication
+  community.network.aireos_config:
+    lines:
+      - "aaa auth mgmt tacacs local"
+    save_when: changed

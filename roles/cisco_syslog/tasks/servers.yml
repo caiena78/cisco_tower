@@ -1,0 +1,47 @@
+---
+- name: Read servers from the NetBox site custom field
+  ansible.builtin.set_fact:
+    cisco_syslog_nb_servers: "{{ netbox_site_response.json.custom_fields[cisco_syslog_netbox_field] }}"
+  when:
+    - cisco_syslog_netbox_enabled | bool
+    - netbox_site_response is defined
+    - netbox_site_response.json is defined
+    - netbox_site_response.json.custom_fields is defined
+    - netbox_site_response.json.custom_fields[cisco_syslog_netbox_field] is defined
+    - netbox_site_response.json.custom_fields[cisco_syslog_netbox_field] is iterable
+    - netbox_site_response.json.custom_fields[cisco_syslog_netbox_field] is not string
+    - netbox_site_response.json.custom_fields[cisco_syslog_netbox_field] | length > 0
+
+# NetBox list wins; the variable list is the fallback. Entries without an ip are dropped,
+# port defaults to 514 and protocol to udp (the old roles failed on missing values).
+- name: Build final server list
+  ansible.builtin.set_fact:
+    cisco_syslog_servers_final: >-
+      {%- set src = cisco_syslog_nb_servers | default([]) -%}
+      {%- if src | length == 0 -%}{%- set src = cisco_syslog.servers -%}{%- endif -%}
+      {%- set out = [] -%}
+      {%- for s in src -%}
+      {%- if s.ip is defined and (s.ip | string | length) > 0 -%}
+      {%- set _ = out.append({'ip': s.ip | string, 'port': (s.port | default(514)) | int, 'protocol': (s.protocol | default('udp')) | lower}) -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {{ out }}
+    cisco_syslog_src_if: >-
+      {{ cisco_syslog.source_interface if (cisco_syslog.source_interface | length > 0) else (mgntINT | default('NOT_SET')) }}
+    cisco_syslog_vrf: >-
+      {%- if cisco_syslog.vrf == 'none' -%}NOT_SET
+      {%- elif cisco_syslog.vrf | length > 0 -%}{{ cisco_syslog.vrf }}
+      {%- else -%}{{ vrf_name | default('NOT_SET') }}{%- endif -%}
+
+- name: No syslog servers found
+  ansible.builtin.debug:
+    msg: "{{ inventory_hostname }}: no syslog servers from NetBox or cisco_syslog.servers; only global settings are applied"
+  when: cisco_syslog_servers_final | length == 0
+
+- name: Show resolved syslog settings
+  ansible.builtin.debug:
+    msg:
+      servers: "{{ cisco_syslog_servers_final }}"
+      source_interface: "{{ cisco_syslog_src_if }}"
+      vrf: "{{ cisco_syslog_vrf }}"
+  when: cisco_syslog_debug | bool

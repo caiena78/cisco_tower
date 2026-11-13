@@ -1,0 +1,74 @@
+---
+cisco_aaa_version: "1.0"
+
+# ios | nxos | aireos. Empty = auto-detect from ansible_network_os.
+cisco_aaa_platform: ""
+# ssh | telnet. telnet (IOS only) is for old images reachable only by telnet (e.g. VG224).
+cisco_aaa_transport: ssh
+
+cisco_aaa_netbox_enabled: true   # NetBox site -> ISE location
+cisco_aaa_ise_enabled: true
+# Remove TACACS servers on the device that are not in cisco_aaa.servers (was remove_undefined_servers)
+cisco_aaa_cleanup: false
+cisco_aaa_debug: false           # true shows task output that normally carries secrets (no_log off)
+
+# ISE ERS API: set ise_hostname, ise_username, ise_password (and ise_verify, ise_port) in
+# inventory / Vault. Shared with cisco_snmp. No placeholder credentials are defined here.
+
+# NetBox credentials: from env (NETBOX_URL / NETBOX_API) unless set in inventory/Vault.
+netbox_url: "{{ lookup('env', 'NETBOX_URL') }}"
+netbox_token: "{{ lookup('env', 'NETBOX_API') }}"
+netbox_validate_certs: false
+
+cisco_aaa:
+  group_name: TACACS-SERVERS
+  key: ""                 # one shared secret: device AND ISE (was tacacs[].key + tacacspwd). Keep in Vault.
+  timeout: 5
+  port: 49
+  servers: []
+  #  - name: ISE-1
+  #    address: 10.0.0.10
+  #    key: ""            # optional per-server override
+  #    timeout: 5         # optional
+  #    port: 49           # optional (NX-OS)
+
+  local_user:             # empty username = skip
+    username: ""
+    password: ""
+    enable_secret: ""     # IOS only
+    nxos_role: network-admin
+    aireos_access: read-write
+
+  ios:
+    legacy_tacacs_syntax: auto    # auto (try modern, fall back) | true | false
+    secret_algorithm: scrypt      # scrypt (falls back to secret) | secret | password
+    accounting_levels: [0, 1, 7, 15]
+
+  nxos:
+    encrypt_type: 0
+    use_ip_host: true             # ip host <name> <address>, server referenced by name
+    use_vrf: true                 # add use-vrf <mgmt vrf> to the server group
+
+  aireos:
+    max_servers: 3
+    force_rewrite: false          # keys cannot be read back; true re-adds every slot
+
+  telnet:
+    port: 23
+    login_prompt: "Username:\\s*"
+    password_prompt: "Password:\\s*"
+    timeout: 30
+    pause: 1
+    prompts: ["Password:\\s*$", "[>#]\\s*$"]
+    secret_algorithm: password    # old images lack scrypt
+
+  ise:
+    device_name: "{{ inventory_hostname }}"
+    description: ""
+    shared_secret: ""             # empty = use cisco_aaa.key
+    location: ""                  # empty = NetBox site custom field ISE_LOCATION
+    device_type:
+      ios: "Device Type#All Device Types#Access Switches"
+      nxos: "Device Type#All Device Types#Nexus Switches"
+      aireos: "Device Type#All Device Types#WLC"
+    skip_log_file: "{{ playbook_dir }}/logs/ise_not_found.log"

@@ -1,0 +1,51 @@
+---
+# snmp-server location: NETCONF when available, otherwise (or on NETCONF failure) CLI.
+- name: Reset location state
+  ansible.builtin.set_fact:
+    cisco_snmp_location_done: false
+
+- name: Set location over NETCONF
+  when: network_transport == 'netconf'
+  block:
+    - name: Push location (NETCONF)
+      ansible.netcommon.netconf_config:
+        content: "{{ lookup('ansible.builtin.template', 'netconf/' ~ cisco_snmp_os ~ '_location.xml.j2') }}"
+      vars:
+        ansible_connection: ansible.netcommon.netconf
+        ansible_network_os: default
+        ansible_port: "{{ network_netconf_port }}"
+
+    - name: Mark location done
+      ansible.builtin.set_fact:
+        cisco_snmp_location_done: true
+  rescue:
+    - name: NETCONF location failed
+      ansible.builtin.fail:
+        msg: "NETCONF location update failed and network_netconf_fallback_on_error is false: {{ ansible_failed_result.msg | default('') }}"
+      when: not (network_netconf_fallback_on_error | bool)
+
+    - name: Falling back to CLI for location
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: NETCONF location failed ({{ ansible_failed_result.msg | default('') | truncate(150) }}); using CLI"
+
+- name: Set SNMP location (IOS CLI)
+  cisco.ios.ios_config:
+    lines:
+      - "snmp-server location {{ SNMP_LOCATION }}"
+    before:
+      - "no snmp-server location"
+    match: strict
+    replace: block
+  when: cisco_snmp_os == 'ios' and not cisco_snmp_location_done
+  ignore_errors: true
+
+- name: Set SNMP location (NX-OS CLI)
+  cisco.nxos.nxos_config:
+    lines:
+      - "snmp-server location {{ SNMP_LOCATION }}"
+    before:
+      - "no snmp-server location"
+    match: strict
+    replace: block
+  when: cisco_snmp_os == 'nxos' and not cisco_snmp_location_done
+  ignore_errors: true

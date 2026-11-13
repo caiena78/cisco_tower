@@ -1,0 +1,20 @@
+---
+# Lines are built to match `show running-config` text exactly (single spaces), so reruns report no change.
+- name: Build IOS syslog lines
+  ansible.builtin.set_fact:
+    cisco_syslog_lines: >-
+      {%- set l = ['logging origin-id hostname'] -%}
+      {%- if cisco_syslog_src_if != 'NOT_SET' -%}
+      {%- set _ = l.append('logging source-interface ' ~ cisco_syslog_src_if ~ ((' vrf ' ~ cisco_syslog_vrf) if cisco_syslog_vrf != 'NOT_SET' else '')) -%}
+      {%- endif -%}
+      {%- for s in cisco_syslog_servers_final -%}
+      {# Fix: the VRF is now on the host line too (it was only on the source-interface) #}
+      {%- set _ = l.append('logging host ' ~ s.ip ~ ((' vrf ' ~ cisco_syslog_vrf) if cisco_syslog_vrf != 'NOT_SET' else '') ~ ' transport ' ~ s.protocol ~ ' port ' ~ s.port) -%}
+      {%- endfor -%}
+      {%- set _ = l.append('logging trap ' ~ cisco_syslog_ios_levels[cisco_syslog.level | int]) -%}
+      {{ l }}
+
+- name: Configure syslog (IOS)
+  cisco.ios.ios_config:
+    lines: "{{ cisco_syslog_lines }}"
+    save_when: "{{ 'modified' if (network_save_config | bool) else 'never' }}"

@@ -1,0 +1,17 @@
+---
+galaxy_info:
+  role_name: cisco_snmp
+  author: Chad Aiena
+  description: Configure SNMPv3 on Cisco IOS/IOS-XE and NX-OS devices (NetBox management ACL + location, Cisco ISE sync, NETCONF with CLI fallback)
+  company: Sapphire Health
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: IOS
+      versions: [all]
+    - name: NXOS
+      versions: [all]
+dependencies: []
+# Calls network_facts (shared helper in this project) via include_role.
+#   collections: cisco.ios, cisco.nxos, ansible.netcommon
+#   python (execution environment, for NETCONF): ncclient, xmltodict

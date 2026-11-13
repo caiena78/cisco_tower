@@ -1,0 +1,13 @@
+---
+# Input: cisco_aaa_apply_blocks
+- name: Apply IOS config blocks
+  cisco.ios.ios_config:
+    parents: "{{ item.parents }}"
+    lines: "{{ item.lines }}"
+    match: "{{ item.match | default('line') }}"
+  loop: "{{ cisco_aaa_apply_blocks }}"
+  loop_control:
+    label: "{{ item.parents | join(' > ') if item.parents | length > 0 else 'global' }}"
+  when: item.lines | length > 0
+  ignore_errors: "{{ item.soft | default(false) }}"
+  no_log: "{{ not (cisco_aaa_debug | bool) }}"

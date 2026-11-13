@@ -1,0 +1,48 @@
+---
+# Sets ansible_network_os for each host from its NetBox platform.
+# Run it BEFORE any role that connects with network_cli/netconf (site_baseline.yml does).
+
+# NetBox credentials come from the environment (populated from Vault, see ../../.env),
+# never from this role. No placeholder values.
+netbox_url: "{{ lookup('env', 'NETBOX_URL') }}"
+netbox_token: "{{ lookup('env', 'NETBOX_API') }}"
+# TLS verification uses netbox_validate_certs when it is set (other roles default it to false),
+# otherwise it is ON. Set netbox_validate_certs in inventory to control both.
+
+# NetBox device name to look up (the inventory hostname by default)
+netbox_network_os_device_name: "{{ inventory_hostname }}"
+
+# true  = always take the value from NetBox (replaces whatever the inventory composed)
+# false = keep ansible_network_os when it is already set
+netbox_network_os_overwrite: true
+
+# What to do when the device is not in NetBox, has no platform, or the platform is not in the map:
+#   fail    = stop the host
+#   skip    = leave ansible_network_os as it is and continue
+#   default = use netbox_network_os_default
+netbox_network_os_on_unmapped: fail
+netbox_network_os_default: ""
+
+netbox_network_os_debug: false
+
+# NetBox platform slug (lower case) -> ansible_network_os. Add your own slugs here.
+netbox_network_os_map:
+  ios: cisco.ios.ios
+  cisco-ios: cisco.ios.ios
+  ios-xe: cisco.ios.ios
+  iosxe: cisco.ios.ios
+  cisco-ios-xe: cisco.ios.ios
+  nxos: cisco.nxos.nxos
+  nx-os: cisco.nxos.nxos
+  cisco-nxos: cisco.nxos.nxos
+  cisco-nx-os: cisco.nxos.nxos
+  aireos: community.network.aireos
+  cisco-aireos: community.network.aireos
+  cisco-wlc: community.network.aireos
+  wlc: community.network.aireos
+  ios-xr: cisco.iosxr.iosxr
+  iosxr: cisco.iosxr.iosxr
+  asa: cisco.asa.asa
+  eos: arista.eos.eos
+  arista-eos: arista.eos.eos
+  junos: junipernetworks.junos.junos

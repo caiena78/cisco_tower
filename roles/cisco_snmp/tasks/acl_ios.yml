@@ -1,0 +1,33 @@
+---
+- name: Build IOS/IOS-XE ACL lines
+  ansible.builtin.set_fact:
+    cisco_snmp_acl_lines: >-
+      {{
+        cisco_snmp_acl_ips
+        | zip(range(10, (cisco_snmp_acl_ips | length * 10) + 1, 10))
+        | map('reverse')
+        | map('join', ' permit ')
+        | list
+      }}
+
+- name: Remove existing ACL (if present)
+  cisco.ios.ios_config:
+    lines: ["no ip access-list standard {{ cisco_snmp_acl_def.name }}"]
+    match: none
+  ignore_errors: true
+
+# One ACE per call. ios_config misbehaves on ACLs of ~50+ lines when they are sent as one block.
+- name: Ensure ACL context exists
+  cisco.ios.ios_config:
+    lines: ["ip access-list standard {{ cisco_snmp_acl_def.name }}"]
+    match: none
+
+- name: Add ACEs to ACL one by one
+  cisco.ios.ios_config:
+    parents: ["ip access-list standard {{ cisco_snmp_acl_def.name }}"]
+    lines: "{{ item }}"
+    match: line
+    replace: line
+  loop: "{{ cisco_snmp_acl_lines }}"
+  loop_control:
+    label: "{{ item }}"

@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: cisco_syslog
+  author: Chad Aiena
+  description: Configure remote syslog on Cisco IOS/IOS-XE and NX-OS (servers from NetBox site field or variables)
+  company: Sapphire Health
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: IOS
+      versions: [all]
+    - name: NXOS
+      versions: [all]
+dependencies: []
+# Calls network_facts via include_role (so cisco_syslog_platform can override detection)
+# collections: cisco.ios, cisco.nxos

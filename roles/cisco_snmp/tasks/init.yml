@@ -1,0 +1,18 @@
+---
+# Shared by main.yml and acl.yml (so acl.yml can be used alone via tasks_from).
+- name: Gather shared network facts (platform, transport, NetBox site, mgmt VRF)
+  ansible.builtin.include_role:
+    name: network_facts
+  vars:
+    network_platform_override: "{{ cisco_snmp_platform }}"
+    network_facts_netbox_enabled: "{{ cisco_snmp_netbox_enabled }}"
+
+- name: Set platform
+  ansible.builtin.set_fact:
+    cisco_snmp_os: "{{ network_platform }}"
+
+- name: Validate platform
+  ansible.builtin.assert:
+    that: cisco_snmp_os in ['ios', 'nxos']
+    fail_msg: "cisco_snmp supports ios and nxos only (got '{{ cisco_snmp_os }}')"
+    quiet: true

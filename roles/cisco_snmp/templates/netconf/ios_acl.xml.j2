@@ -1,0 +1,23 @@
+{# Replaces the whole standard ACL in one edit-config, so there is no window where the ACL is missing. #}
+<config xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+  <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+    <ip>
+      <access-list>
+        <standard xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-acl" nc:operation="replace">
+          <name>{{ cisco_snmp_acl_def.name | e }}</name>
+{% for ip in cisco_snmp_acl_ips %}
+          <access-list-seq-rule>
+            <sequence>{{ (loop.index * 10) }}</sequence>
+            <permit>
+              <std-ace>
+                <prefix>{{ ip }}</prefix>
+                <mask>0.0.0.0</mask>
+              </std-ace>
+            </permit>
+          </access-list-seq-rule>
+{% endfor %}
+        </standard>
+      </access-list>
+    </ip>
+  </native>
+</config>

@@ -1,0 +1,61 @@
+---
+# Telnet-only IOS: one session reads interface summary + running-config.
+# Replaces get_mgnt_vrf (needs SSH facts) with inline parsing; also takes the ISE device name from the hostname line.
+- name: Read interfaces and running-config over telnet
+  ansible.netcommon.telnet:
+    host: "{{ ansible_host }}"
+    port: "{{ cisco_aaa.telnet.port }}"
+    user: "{{ ansible_user }}"
+    password: "{{ ansible_password }}"
+    login_prompt: "{{ cisco_aaa.telnet.login_prompt }}"
+    password_prompt: "{{ cisco_aaa.telnet.password_prompt }}"
+    prompts: "{{ cisco_aaa.telnet.prompts }}"
+    timeout: "{{ cisco_aaa.telnet.timeout }}"
+    pause: "{{ cisco_aaa.telnet.pause }}"
+    command: "{{ ['terminal length 0'] + (['enable', ansible_become_password] if ansible_become_password is defined else []) + ['show ip interface brief', 'show running-config'] }}"
+  register: cisco_aaa_telnet_read
+  delegate_to: localhost
+  no_log: true
+  vars:
+    ansible_connection: local
+
+- name: Parse management interface, VRF and hostname
+  ansible.builtin.set_fact:
+    cisco_aaa_ios_running: "{{ cisco_aaa_telnet_read.output[-1] }}"
+    mgntINT: >-
+      {%- set ns = namespace(n='NOT_SET') -%}
+      {%- for l in cisco_aaa_telnet_read.output[-2].splitlines() -%}
+      {%- set p = l.split() -%}
+      {%- if p | length > 1 and p[1] == ansible_host -%}{%- set ns.n = p[0] -%}{%- endif -%}
+      {%- endfor -%}
+      {{ ns.n }}
+    cisco_aaa_telnet_hostname: >-
+      {{ (cisco_aaa_telnet_read.output[-1] | regex_search('(?m)^hostname (\S+)', '\1') | default([''], true) | first) }}
+  no_log: true
+
+- name: Find VRF of the management interface
+  ansible.builtin.set_fact:
+    vrf_name: >-
+      {%- set ns = namespace(on=false, v='NOT_SET') -%}
+      {%- for l in cisco_aaa_ios_running.splitlines() -%}
+      {%- if l == 'interface ' ~ mgntINT -%}{%- set ns.on = true -%}
+      {%- elif ns.on and not l.startswith(' ') -%}{%- set ns.on = false -%}
+      {%- elif ns.on and l.strip().startswith('vrf forwarding ') -%}{%- set ns.v = l.strip().split(' ')[2] -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {{ ns.v }}
+  when: mgntINT != 'NOT_SET'
+  no_log: true
+
+- name: Default VRF
+  ansible.builtin.set_fact:
+    vrf_name: NOT_SET
+  when: mgntINT == 'NOT_SET'
+
+# Match ISE by the device's own hostname (old telnet role behavior) unless a name was set explicitly
+- name: Use device hostname as ISE device name
+  ansible.builtin.set_fact:
+    cisco_aaa_ise_device_name: "{{ cisco_aaa_telnet_hostname }}"
+  when:
+    - cisco_aaa_telnet_hostname | length > 0
+    - ise_device_name is not defined

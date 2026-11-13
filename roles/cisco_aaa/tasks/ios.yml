@@ -1,0 +1,82 @@
+---
+# IOS / IOS-XE over SSH (network_cli)
+- name: Read running-config
+  cisco.ios.ios_command:
+    commands: ["show running-config"]
+  register: cisco_aaa_ios_run_raw
+  no_log: "{{ not (cisco_aaa_debug | bool) }}"
+
+- name: Keep running-config for planning
+  ansible.builtin.set_fact:
+    cisco_aaa_ios_running: "{{ cisco_aaa_ios_run_raw.stdout[0] }}"
+  no_log: true
+
+# ---- local user: try the configured algorithm; scrypt falls back to plain secret on old images ----
+- name: Configure local user
+  block:
+    - name: Build local user ({{ cisco_aaa.ios.secret_algorithm }})
+      ansible.builtin.set_fact:
+        cisco_aaa_ios_algo: "{{ cisco_aaa.ios.secret_algorithm }}"
+    - name: Build local user blocks
+      ansible.builtin.include_tasks: ios_user_blocks.yml
+    - name: Apply local user
+      ansible.builtin.include_tasks: ios_apply.yml
+      vars:
+        cisco_aaa_apply_blocks: "{{ cisco_aaa_ios_user_blocks }}"
+  rescue:
+    - name: Retry local user with plain secret
+      when: cisco_aaa.ios.secret_algorithm == 'scrypt'
+      block:
+        - name: Use plain secret
+          ansible.builtin.set_fact:
+            cisco_aaa_ios_algo: secret
+        - name: Build local user blocks
+          ansible.builtin.include_tasks: ios_user_blocks.yml
+        - name: Apply local user
+          ansible.builtin.include_tasks: ios_apply.yml
+          vars:
+            cisco_aaa_apply_blocks: "{{ cisco_aaa_ios_user_blocks }}"
+    - name: Fail when the algorithm was not scrypt
+      ansible.builtin.fail:
+        msg: "Local user configuration failed"
+      when: cisco_aaa.ios.secret_algorithm != 'scrypt'
+
+# ---- TACACS: modern 'tacacs server' syntax, legacy 'tacacs-server host' as fallback ----
+- name: Choose TACACS syntax
+  ansible.builtin.set_fact:
+    cisco_aaa_ios_syntax: "{{ 'legacy' if (cisco_aaa.ios.legacy_tacacs_syntax | string | lower == 'true') else 'modern' }}"
+
+- name: Configure TACACS and AAA
+  block:
+    - name: Build config blocks ({{ cisco_aaa_ios_syntax }} syntax)
+      ansible.builtin.include_tasks: ios_build.yml
+    - name: Apply config blocks
+      ansible.builtin.include_tasks: ios_apply.yml
+      vars:
+        cisco_aaa_apply_blocks: "{{ cisco_aaa_ios_blocks }}"
+  rescue:
+    - name: Retry with legacy TACACS syntax
+      when:
+        - cisco_aaa_ios_syntax == 'modern'
+        - cisco_aaa.ios.legacy_tacacs_syntax | string | lower == 'auto'
+      block:
+        - name: Switch to legacy syntax
+          ansible.builtin.set_fact:
+            cisco_aaa_ios_syntax: legacy
+        - name: Build config blocks (legacy syntax)
+          ansible.builtin.include_tasks: ios_build.yml
+        - name: Apply config blocks (legacy syntax)
+          ansible.builtin.include_tasks: ios_apply.yml
+          vars:
+            cisco_aaa_apply_blocks: "{{ cisco_aaa_ios_blocks }}"
+    - name: Fail when no fallback applies
+      ansible.builtin.fail:
+        msg: "IOS AAA configuration failed (set cisco_aaa_debug: true to see the device error)"
+      # No fallback was possible: not 'auto', or the legacy attempt was already the one that failed.
+      # (After a successful auto retry the syntax is 'legacy' with setting 'auto', so this stays skipped.)
+      when: cisco_aaa_ios_syntax != 'legacy' or (cisco_aaa.ios.legacy_tacacs_syntax | string | lower) != 'auto'
+
+- name: Save configuration
+  cisco.ios.ios_config:
+    save_when: always
+  when: network_save_config | bool

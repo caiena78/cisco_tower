@@ -1,0 +1,24 @@
+---
+# Runs once per host per play; later callers reuse the facts.
+- name: Gather shared network facts
+  when: not (network_facts_done | default(false) | bool)
+  block:
+    - name: Detect platform
+      ansible.builtin.include_tasks: platform.yml
+
+    - name: Select transport (NETCONF or CLI)
+      ansible.builtin.include_tasks: transport.yml
+
+    - name: NetBox site lookup
+      ansible.builtin.include_tasks: netbox_site.yml
+      when: network_facts_netbox_enabled | bool
+
+    - name: Management interface and VRF
+      ansible.builtin.include_tasks: "mgmt_{{ network_platform }}.yml"
+      when:
+        - network_facts_mgmt_enabled | bool
+        - network_platform in ['ios', 'nxos']
+
+    - name: Mark facts as gathered
+      ansible.builtin.set_fact:
+        network_facts_done: true

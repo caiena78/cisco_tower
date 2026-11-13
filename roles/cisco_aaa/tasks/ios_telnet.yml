@@ -1,0 +1,61 @@
+---
+# IOS over telnet. Same command list as ios.yml (ios_build.yml), sent as one session.
+# There is no running-config diffing over telnet, so this path always reports changed.
+- name: Choose TACACS syntax
+  ansible.builtin.set_fact:
+    cisco_aaa_ios_syntax: "{{ 'legacy' if (cisco_aaa.ios.legacy_tacacs_syntax | string | lower == 'true') else 'modern' }}"
+
+- name: Build local user blocks
+  ansible.builtin.include_tasks: ios_user_blocks.yml
+  vars:
+    cisco_aaa_ios_algo: "{{ cisco_aaa.telnet.secret_algorithm }}"
+
+- name: Build AAA config blocks
+  ansible.builtin.include_tasks: ios_build.yml
+
+# Flatten {parents, lines} blocks into one command stream. soft blocks may error without failing the run.
+- name: Build telnet command stream
+  ansible.builtin.set_fact:
+    cisco_aaa_telnet_cmds: >-
+      {%- set c = [] -%}
+      {%- set soft = [] -%}
+      {%- macro add(cmd, s) -%}{%- set _ = c.append(cmd) -%}{%- set _ = soft.append(s) -%}{%- endmacro -%}
+      {{ add('terminal length 0', true) -}}
+      {%- if ansible_become_password is defined -%}{{ add('enable', true) -}}{{ add(ansible_become_password, true) -}}{%- endif -%}
+      {{ add('configure terminal', false) -}}
+      {%- for blk in (cisco_aaa_ios_user_blocks + cisco_aaa_ios_blocks) -%}
+      {%- for p in blk.parents -%}{{ add(p, blk.soft | default(false)) -}}{%- endfor -%}
+      {%- for l in blk.lines -%}{{ add(l, blk.soft | default(false)) -}}{%- endfor -%}
+      {%- for p in blk.parents -%}{{ add('exit', true) -}}{%- endfor -%}
+      {%- endfor -%}
+      {{ add('end', true) -}}
+      {{ add('write memory', false) -}}
+      {{ {'cmds': c, 'soft': soft} }}
+  no_log: true
+
+- name: Send configuration over telnet
+  ansible.netcommon.telnet:
+    host: "{{ ansible_host }}"
+    port: "{{ cisco_aaa.telnet.port }}"
+    user: "{{ ansible_user }}"
+    password: "{{ ansible_password }}"
+    login_prompt: "{{ cisco_aaa.telnet.login_prompt }}"
+    password_prompt: "{{ cisco_aaa.telnet.password_prompt }}"
+    prompts: "{{ cisco_aaa.telnet.prompts }}"
+    timeout: "{{ cisco_aaa.telnet.timeout }}"
+    pause: "{{ cisco_aaa.telnet.pause }}"
+    command: "{{ cisco_aaa_telnet_cmds.cmds }}"
+  register: cisco_aaa_telnet_result
+  delegate_to: localhost
+  no_log: "{{ not (cisco_aaa_debug | bool) }}"
+  vars:
+    ansible_connection: local
+  failed_when: >-
+    {%- set ns = namespace(bad=false) -%}
+    {%- for o in (cisco_aaa_telnet_result.output | default([])) -%}
+    {%- if (o is search('% Invalid input|% Incomplete command|% Ambiguous command|Bad secret|command authorization failed'))
+           and not (cisco_aaa_telnet_cmds.soft[loop.index0] | default(false)) -%}
+    {%- set ns.bad = true -%}
+    {%- endif -%}
+    {%- endfor -%}
+    {{ ns.bad }}

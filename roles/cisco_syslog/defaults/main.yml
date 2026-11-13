@@ -1,0 +1,32 @@
+---
+cisco_syslog_version: "1.0"
+
+# ios | nxos. Empty = auto-detect from ansible_network_os.
+cisco_syslog_platform: ""
+
+# Take servers from the NetBox site custom field (JSON list of {ip, port, protocol}).
+cisco_syslog_netbox_enabled: true
+cisco_syslog_netbox_field: syslog
+cisco_syslog_debug: false
+
+# NetBox credentials: from env (NETBOX_URL / NETBOX_API) unless set in inventory/Vault.
+netbox_url: "{{ lookup('env', 'NETBOX_URL') }}"
+netbox_token: "{{ lookup('env', 'NETBOX_API') }}"
+netbox_validate_certs: false
+
+cisco_syslog:
+  # Used when NetBox has no list for the site.
+  servers: []
+  #  - ip: 10.1.1.1
+  #    port: 514        # default 514
+  #    protocol: udp    # udp|tcp, IOS only (ignored on NX-OS)
+
+  level: 6              # 0-7. IOS: logging trap <keyword>; NX-OS: logging level all N + per-server severity
+
+  # Empty = use the detected management interface / VRF (network_facts).
+  # vrf: "none" forces the global table.
+  source_interface: ""
+  vrf: ""
+
+  # NX-OS: logging origin-id string <prefix><hostname>. The old role hardcoded "123456:".
+  origin_id_prefix: "123456:"
