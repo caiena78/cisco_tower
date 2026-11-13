@@ -15,7 +15,6 @@ Platforms: Cisco IOS / IOS-XE, NX-OS, and (AAA only) AireOS WLC; IOS over telnet
 ```
 site_baseline.yml          # everything: platform + facts, then snmp, aaa, syslog (tagged)
 snmp_acl_update.yml        # only the SNMP management ACL, refreshed from NetBox
-netbox_inventory.yml       # NetBox dynamic inventory
 collections/requirements.yml
 .env                       # Vault location and field names only - no secrets
 roles/
@@ -62,15 +61,15 @@ Also keep these in Vault / Tower credentials (never in `group_vars`):
 
 ```bash
 # everything, one host, no changes
-ansible-playbook -i netbox_inventory.yml site_baseline.yml --limit <host> --check --diff
+ansible-playbook -i <inventory> site_baseline.yml --limit <host> --check --diff
 
 # one function
-ansible-playbook -i netbox_inventory.yml site_baseline.yml --tags snmp   --limit <host>
-ansible-playbook -i netbox_inventory.yml site_baseline.yml --tags aaa    --limit <host>
-ansible-playbook -i netbox_inventory.yml site_baseline.yml --tags syslog --limit <host>
+ansible-playbook -i <inventory> site_baseline.yml --tags snmp   --limit <host>
+ansible-playbook -i <inventory> site_baseline.yml --tags aaa    --limit <host>
+ansible-playbook -i <inventory> site_baseline.yml --tags syslog --limit <host>
 
 # only the SNMP management ACL
-ansible-playbook -i netbox_inventory.yml snmp_acl_update.yml --limit <host>
+ansible-playbook -i <inventory> snmp_acl_update.yml --limit <host>
 ```
 
 ### Tags
@@ -121,8 +120,6 @@ software versions. See `roles/network_facts/README.md`.
 * The site custom fields used: `SNMP_LOCATION` (SNMP), `syslog` (a JSON list of `{ip, port, protocol}`),
   `ISE_LOCATION` (AAA / ISE).
 * IPs tagged `snmp_acl_allow` (configurable with `cisco_snmp.acl.tag`) become the SNMP management ACL.
-* `netbox_inventory.yml` sets `ansible_network_os: platform[0]`, which looks unintended and is overridden by
-  `netbox_network_os`; consider removing it.
 
 ## Safety behavior worth knowing
 
