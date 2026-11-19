@@ -1,0 +1,49 @@
+<config xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+  <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+    <logging>
+      <origin-id>
+        <hostname/>
+      </origin-id>
+{% if cisco_syslog_src_if != 'NOT_SET' %}
+      <source-interface>
+        <interface-name>{{ cisco_syslog_src_if | e }}</interface-name>
+{% if cisco_syslog_vrf != 'NOT_SET' %}
+        <vrf>{{ cisco_syslog_vrf | e }}</vrf>
+{% endif %}
+      </source-interface>
+{% endif %}
+{% if cisco_syslog_servers_final | length > 0 %}
+      <host>
+{% for s in cisco_syslog_servers_final if cisco_syslog_vrf == 'NOT_SET' %}
+        <ipv4-host-transport-list>
+          <ipv4-host>{{ s.ip | e }}</ipv4-host>
+          <transport>
+            <{{ s.protocol }}>
+              <{{ s.protocol }}-port-list>
+                <port>{{ s.port }}</port>
+              </{{ s.protocol }}-port-list>
+            </{{ s.protocol }}>
+          </transport>
+        </ipv4-host-transport-list>
+{% endfor %}
+{% for s in cisco_syslog_servers_final if cisco_syslog_vrf != 'NOT_SET' %}
+        <ipv4-host-vrf-transport-list>
+          <ipv4-host>{{ s.ip | e }}</ipv4-host>
+          <vrf>{{ cisco_syslog_vrf | e }}</vrf>
+          <transport>
+            <{{ s.protocol }}>
+              <{{ s.protocol }}-port-list>
+                <port>{{ s.port }}</port>
+              </{{ s.protocol }}-port-list>
+            </{{ s.protocol }}>
+          </transport>
+        </ipv4-host-vrf-transport-list>
+{% endfor %}
+      </host>
+{% endif %}
+      <trap>
+        <severity>{{ cisco_syslog_ios_levels[cisco_syslog.level | int] }}</severity>
+      </trap>
+    </logging>
+  </native>
+</config>

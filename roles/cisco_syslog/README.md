@@ -21,7 +21,7 @@ and VRF come from `network_facts`.
 | servers | `logging host <ip> [vrf <vrf>] transport <udp\|tcp> port <n>` | `logging server <ip> <level> [port <n>] [use-vrf <vrf>]` |
 | level | `logging trap <keyword>` | `logging level all <n>` |
 
-All lines go out in one `*_config` call. Transport: CLI (see `network_facts` for what NETCONF covers).
+IOS-XE with tcp/830 open: one NETCONF edit-config (candidate + commit when advertised, else running), CLI fallback on error. NX-OS and IOS without NETCONF: all lines in one `*_config` call. See `network_facts`.
 
 ## Variables (see `defaults/main.yml`)
 

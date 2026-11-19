@@ -1,120 +1,17 @@
 ---
 # Cisco IOS / IOS-XE SNMPv3
-- name: Configure SNMP views (RO/RW)
-  cisco.ios.ios_config:
-    lines:
-      - "snmp-server view {{ item.value }} internet included"
-    match: line
-  loop: "{{ cisco_snmp.views | dict2items }}"
-  loop_control:
-    label: "{{ item.key }} => {{ item.value }}"
-
-# RO group reads ro-view; RW group reads ro-view and writes rw-view
-- name: Configure SNMP groups (RO / RW)
-  cisco.ios.ios_config:
-    lines:
-      - >-
-        snmp-server group {{ cisco_snmp.groups[item] }} v3 priv
-        read {{ cisco_snmp.views.ro }}
-        {% if item == 'rw' %}write {{ cisco_snmp.views.rw }}{% endif %}
-        access {{ cisco_snmp.acl.name }}
-    match: strict
-    replace: block
-  loop: [ro, rw]
-
-- name: Configure SNMP group context
-  cisco.ios.ios_config:
-    lines:
-      - "snmp-server group {{ cisco_snmp.groups[item] }} v3 priv context {{ cisco_snmp.group_context.prefix }} match prefix"
-    match: strict
-    replace: block
-  loop: [ro, rw]
-  when:
-    - cisco_snmp.group_context is defined
-    - cisco_snmp.group_context.enabled | bool
-    - cisco_snmp.group_context.prefix | default('') | length > 0
-
-# ---- Users: delete existing line, then recreate ----
-- name: Get existing SNMPv3 user lines
-  cisco.ios.ios_command:
-    commands:
-      - "show running-config | include ^snmp-server user "
-  register: snmp_users_raw
-
-- name: Build map of existing SNMPv3 user -> config line
+# Views, groups, users and hosts: NETCONF first (IOS-XE, tcp/830 open), CLI fallback.
+- name: Reset core SNMP state
   ansible.builtin.set_fact:
-    existing_snmp_user_map: >-
-      {%- set d = {} -%}
-      {%- for l in (snmp_users_raw.stdout_lines[0] | default([])) -%}
-      {%- set parts = l.split() -%}
-      {%- if parts | length > 2 and parts[0] == 'snmp-server' and parts[1] == 'user' -%}
-      {%- set _ = d.update({ parts[2]: l }) -%}
-      {%- endif -%}
-      {%- endfor -%}
-      {{ d }}
+    cisco_snmp_core_done: false
 
-- name: Remove SNMPv3 users we manage (exact existing line)
-  cisco.ios.ios_config:
-    lines:
-      - "no {{ existing_snmp_user_map[item.username] }}"
-    match: none
-  loop: "{{ cisco_snmp.users }}"
-  loop_control:
-    label: "{{ item.username }}"
-  when: item.username in existing_snmp_user_map
-  ignore_errors: true
+- name: Configure SNMP core over NETCONF
+  ansible.builtin.include_tasks: ios_netconf.yml
+  when: network_transport == 'netconf'
 
-- name: Configure SNMPv3 users
-  cisco.ios.ios_config:
-    lines:
-      - >-
-        snmp-server user {{ item.username }}
-        {{ cisco_snmp.groups[item.access] }}
-        v3 auth {{ item.auth_proto }} {{ item.auth_pass }}
-        priv {{ item.priv_proto }} {{ item.priv_bits | default(128) }} {{ item.priv_pass }}
-        access {{ cisco_snmp.acl.name }}
-    match: none
-  loop: "{{ cisco_snmp.users }}"
-  loop_control:
-    label: "{{ item.username }} ({{ item.access }})"
-  no_log: true
-
-# ---- Hosts ----
-- name: Get existing SNMP host lines
-  cisco.ios.ios_command:
-    commands:
-      - "show running-config | include ^snmp-server host "
-  register: snmp_hosts_raw
-
-- name: Build desired SNMP host lines (users with 'host')
-  ansible.builtin.set_fact:
-    desired_snmp_host_lines: >-
-      {%- set lines = [] -%}
-      {%- for u in cisco_snmp.users -%}
-      {%- if u.host is defined and (u.host | string | length) > 0 -%}
-      {%- set _ = lines.append('snmp-server host ' ~ (u.host | string) ~ ' version 3 priv ' ~ u.username) -%}
-      {%- endif -%}
-      {%- endfor -%}
-      {{ lines }}
-
-- name: Remove existing SNMP host lines for managed users
-  cisco.ios.ios_config:
-    lines: >-
-      {{
-        (snmp_hosts_raw.stdout_lines[0] | default([]))
-        | select('search', ' version 3 [^ ]+ (' ~ (cisco_snmp.users | map(attribute='username') | map('regex_escape') | join('|')) ~ ')$')
-        | map('regex_replace', '^', 'no ')
-        | list
-      }}
-    match: none
-  when: (snmp_hosts_raw.stdout_lines[0] | default([])) | length > 0
-  ignore_errors: true
-
-- name: Configure SNMP hosts
-  cisco.ios.ios_config:
-    lines: "{{ desired_snmp_host_lines }}"
-    match: none
-  when: desired_snmp_host_lines | length > 0
+- name: Configure SNMP core over CLI
+  ansible.builtin.include_tasks: ios_core_cli.yml
+  when: not cisco_snmp_core_done
 
 # ---- v2c community ACL retrofit ----
 - name: Get SNMP community config lines

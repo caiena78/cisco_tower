@@ -1,0 +1,66 @@
+<config xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+  <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+    <snmp-server xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-snmp">
+{% for v in cisco_snmp.views.values() | unique %}
+      <view>
+        <name>{{ v | e }}</name>
+        <oid-tree>
+          <name>internet</name>
+          <inc-exl>included</inc-exl>
+        </oid-tree>
+      </view>
+{% endfor %}
+{% for g in ['ro', 'rw'] %}
+      <group>
+        <id>{{ cisco_snmp.groups[g] | e }}</id>
+        <v3>
+          <security-level>
+            <level>priv</level>
+            <read>{{ cisco_snmp.views.ro | e }}</read>
+{% if g == 'rw' %}
+            <write>{{ cisco_snmp.views.rw | e }}</write>
+{% endif %}
+            <access>
+              <acl-name>{{ cisco_snmp.acl.name | e }}</acl-name>
+            </access>
+          </security-level>
+{% if cisco_snmp.group_context is defined and cisco_snmp.group_context.enabled | bool and cisco_snmp.group_context.prefix | default('') | length > 0 %}
+          <context>
+            <context-name>{{ cisco_snmp.group_context.prefix | e }}</context-name>
+            <match>prefix</match>
+          </context>
+{% endif %}
+        </v3>
+      </group>
+{% endfor %}
+{% for u in cisco_snmp.users %}
+      <user nc:operation="replace">
+        <username>{{ u.username | e }}</username>
+        <grpname>{{ cisco_snmp.groups[u.access] | e }}</grpname>
+        <v3>
+          <auth>
+            <{{ u.auth_proto | lower }}>{{ u.auth_pass | e }}</{{ u.auth_proto | lower }}>
+          </auth>
+          <priv>
+            <{{ u.priv_proto | lower }}>
+              <bits>{{ u.priv_bits | default(128) }}</bits>
+              <key>{{ u.priv_pass | e }}</key>
+            </{{ u.priv_proto | lower }}>
+          </priv>
+          <access>
+            <acl-name>{{ cisco_snmp.acl.name | e }}</acl-name>
+          </access>
+        </v3>
+      </user>
+{% endfor %}
+{% for u in cisco_snmp.users if u.host is defined and (u.host | string | length) > 0 %}
+      <host>
+        <ip-address>{{ u.host | e }}</ip-address>
+        <community-or-user>{{ u.username | e }}</community-or-user>
+        <version>3</version>
+        <security-level>priv</security-level>
+      </host>
+{% endfor %}
+    </snmp-server>
+  </native>
+</config>

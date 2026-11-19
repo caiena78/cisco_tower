@@ -1,0 +1,28 @@
+---
+# IOS-XE SNMP views/groups/users/hosts in one edit-config.
+# datastore: auto -> candidate (+ commit) when the device advertises :candidate, otherwise running.
+# Users carry operation="replace" so an existing user is recreated, like the CLI delete + add.
+- name: Push SNMP core config (NETCONF)
+  block:
+    - name: Edit-config SNMP views, groups, users, hosts
+      ansible.netcommon.netconf_config:
+        content: "{{ lookup('ansible.builtin.template', 'netconf/ios_snmp.xml.j2') }}"
+        datastore: auto
+      no_log: true
+      vars:
+        ansible_connection: ansible.netcommon.netconf
+        ansible_network_os: default
+        ansible_port: "{{ network_netconf_port }}"
+
+    - name: Mark core done
+      ansible.builtin.set_fact:
+        cisco_snmp_core_done: true
+  rescue:
+    - name: NETCONF core failed
+      ansible.builtin.fail:
+        msg: "NETCONF SNMP update failed and network_netconf_fallback_on_error is false"
+      when: not (network_netconf_fallback_on_error | bool)
+
+    - name: Falling back to CLI for SNMP core
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: NETCONF SNMP update failed; using CLI"
