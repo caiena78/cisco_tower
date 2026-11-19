@@ -26,8 +26,8 @@
 - name: Set vrf_name
   ansible.builtin.set_fact:
     vrf_name: >-
-      {%- set m = (network_facts_mgmt_cfg.stdout[0] | default('')) | regex_search('(?m)^\s*vrf member (\S+)', '\1') -%}
-      {{ (m | first) if (m is not none and m | length > 0) else 'NOT_SET' }}
+      {%- set m = (network_facts_mgmt_cfg.stdout[0] | default('')) | regex_findall('(?m)^\s*vrf member (\S+)') -%}
+      {{ (m | first) if (m | length > 0) else 'NOT_SET' }}
   when: mgntINT != 'NOT_SET'
 
 - name: Show management interface

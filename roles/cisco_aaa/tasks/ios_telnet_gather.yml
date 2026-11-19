@@ -30,7 +30,7 @@
       {%- endfor -%}
       {{ ns.n }}
     cisco_aaa_telnet_hostname: >-
-      {{ (cisco_aaa_telnet_read.output[-1] | regex_search('(?m)^hostname (\S+)', '\1') | default([''], true) | first) }}
+      {{ (cisco_aaa_telnet_read.output[-1] | regex_findall('(?m)^hostname (\S+)') | default([''], true) | first) }}
   no_log: true
 
 - name: Find VRF of the management interface
