@@ -11,6 +11,7 @@
       no_log: true
       vars:
         ansible_connection: ansible.netcommon.netconf
+        ansible_host_key_checking: "{{ network_netconf_host_key_checking }}"
         ansible_network_os: default
         ansible_port: "{{ network_netconf_port }}"
 

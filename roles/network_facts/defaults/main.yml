@@ -17,6 +17,10 @@ network_platform_override: ""
 network_transport_preference: auto
 network_netconf_port: 830
 network_netconf_probe_timeout: 3
+# NETCONF host keys are looked up per port ([host]:830), separately from the port 22 entry SSH/network_cli uses.
+# false = do not verify (no known_hosts entry needed, set by choice for this fleet).
+# true  = require one, e.g. ssh-keyscan -p 830 <host> >> ~/.ssh/known_hosts
+network_netconf_host_key_checking: false
 # If a NETCONF edit fails mid-run, redo that role's work over CLI
 network_netconf_fallback_on_error: true
 # Save running -> startup after NETCONF edits (NX-OS needs one CLI command for this)
