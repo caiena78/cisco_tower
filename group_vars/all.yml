@@ -1,0 +1,6 @@
+---
+# Network devices connect with network_cli (ansible_network_os is set per host from NetBox by
+# netbox_network_os). Tasks that need another connection override it with task vars:
+# local (NetBox/ISE calls), ansible.netcommon.netconf (NETCONF), telnet (cisco_aaa).
+# SSH credentials (ansible_user / ansible_password) come from Tower credentials or Vault, not this repo.
+ansible_connection: ansible.netcommon.network_cli
