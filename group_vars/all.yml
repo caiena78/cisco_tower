@@ -8,3 +8,4 @@ ansible_connection: ansible.netcommon.network_cli
 # Do not require every device in known_hosts (chosen for this fleet). Set true to verify; the NETCONF
 # tasks have their own switch, network_netconf_host_key_checking (roles/network_facts/defaults).
 ansible_host_key_checking: false
+network_netconf_host_key_checking: false
