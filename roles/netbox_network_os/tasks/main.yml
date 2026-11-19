@@ -1,6 +1,10 @@
 ---
 - name: Set ansible_network_os from NetBox
   when: not (netbox_network_os_done | default(false) | bool)
+  # This role runs before ansible_network_os exists, and network_cli cannot load without it,
+  # so nothing in here may use the device connection (group_vars sets network_cli).
+  vars:
+    ansible_connection: local
   block:
     - name: Keep existing ansible_network_os
       ansible.builtin.set_fact:
