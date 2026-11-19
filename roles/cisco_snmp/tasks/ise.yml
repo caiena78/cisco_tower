@@ -26,6 +26,7 @@
           }}
 
     - name: Check if device exists in Cisco ISE by IP
+      check_mode: false   # read-only lookup; later tasks need the result
       ansible.builtin.uri:
         url: "https://{{ ise_hostname }}:{{ ise_port }}/ers/config/networkdevice?filter=ipaddress.EQ.{{ ansible_host }}"
         method: GET
@@ -47,6 +48,7 @@
         ise_snmp_device_found: "{{ ise_snmp_ip_check.json.SearchResult.total | int > 0 }}"
 
     - name: Get full device record from Cisco ISE
+      check_mode: false   # read-only lookup; later tasks need the result
       ansible.builtin.uri:
         url: "https://{{ ise_hostname }}:{{ ise_port }}/ers/config/networkdevice/{{ ise_snmp_ip_check.json.SearchResult.resources[0].id }}"
         method: GET

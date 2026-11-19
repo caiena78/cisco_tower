@@ -11,6 +11,7 @@
     cisco_snmp_acl_def: "{{ mgnt_acl | default(cisco_snmp.acl) }}"
 
 - name: Get IPs tagged {{ cisco_snmp_acl_def.tag }} from NetBox
+  check_mode: false   # read-only lookup; later tasks need the result
   ansible.builtin.uri:
     url: "{{ netbox_url }}/api/ipam/ip-addresses/?tag={{ cisco_snmp_acl_def.tag }}&limit=1000"
     method: GET

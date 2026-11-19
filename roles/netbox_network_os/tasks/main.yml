@@ -28,6 +28,7 @@
             quiet: true
 
         - name: Get device from NetBox
+          check_mode: false   # read-only lookup; later tasks need the result
           ansible.builtin.uri:
             url: "{{ netbox_url }}/api/dcim/devices/?name={{ netbox_network_os_device_name | urlencode }}"
             method: GET
