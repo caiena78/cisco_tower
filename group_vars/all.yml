@@ -4,3 +4,7 @@
 # local (NetBox/ISE calls), ansible.netcommon.netconf (NETCONF), telnet (cisco_aaa).
 # SSH credentials (ansible_user / ansible_password) come from Tower credentials or Vault, not this repo.
 ansible_connection: ansible.netcommon.network_cli
+
+# Do not require every device in known_hosts (chosen for this fleet). Set true to verify; the NETCONF
+# tasks have their own switch, network_netconf_host_key_checking (roles/network_facts/defaults).
+ansible_host_key_checking: false
