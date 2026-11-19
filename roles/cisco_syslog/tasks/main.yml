@@ -2,6 +2,7 @@
 - name: Gather shared network facts (platform, transport, NetBox site, mgmt VRF)
   ansible.builtin.include_role:
     name: network_facts
+    public: true   # expose network_facts defaults/facts (network_netconf_*) to the calling role
   vars:
     network_platform_override: "{{ cisco_syslog_platform }}"
     network_facts_netbox_enabled: "{{ cisco_syslog_netbox_enabled }}"

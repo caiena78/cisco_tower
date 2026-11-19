@@ -2,6 +2,7 @@
 - name: Gather shared network facts (platform, NetBox site, mgmt VRF)
   ansible.builtin.include_role:
     name: network_facts
+    public: true   # expose network_facts defaults/facts (network_netconf_*) to the calling role
   vars:
     network_platform_override: "{{ cisco_aaa_platform }}"
     network_facts_netbox_enabled: "{{ cisco_aaa_netbox_enabled }}"
@@ -11,6 +12,7 @@
 - name: Gather shared network facts (telnet device)
   ansible.builtin.include_role:
     name: network_facts
+    public: true   # expose network_facts defaults/facts (network_netconf_*) to the calling role
   vars:
     network_platform_override: "{{ cisco_aaa_platform }}"
     network_facts_netbox_enabled: "{{ cisco_aaa_netbox_enabled }}"
