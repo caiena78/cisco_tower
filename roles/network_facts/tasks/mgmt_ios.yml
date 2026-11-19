@@ -10,7 +10,7 @@
   ansible.builtin.set_fact:
     mgntINT: >-
       {%- set ns = namespace(n='NOT_SET') -%}
-      {%- for i in (ansible_network_resources.l3_interfaces | default([])) -%}
+      {%- for i in (ansible_facts.network_resources.l3_interfaces | default([])) -%}
       {%- for a in (i.ipv4 | default([])) -%}
       {%- if (a.address | default('')).split(' ')[0].split('/')[0] == ansible_host -%}{%- set ns.n = i.name -%}{%- endif -%}
       {%- endfor -%}
