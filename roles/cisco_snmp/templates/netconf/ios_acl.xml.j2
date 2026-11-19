@@ -10,8 +10,7 @@
             <sequence>{{ (loop.index * 10) }}</sequence>
             <permit>
               <std-ace>
-                <prefix>{{ ip }}</prefix>
-                <mask>0.0.0.0</mask>
+                <host-address>{{ ip }}</host-address>
               </std-ace>
             </permit>
           </access-list-seq-rule>
