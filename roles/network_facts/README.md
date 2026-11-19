@@ -50,7 +50,7 @@ not implemented because the exact paths must be validated against your IOS-XE/NX
 
 ## Variables
 
-See `defaults/main.yml`. NetBox credentials default to the environment (`NETBOX_URL`, `NETBOX_API`);
+See `defaults/main.yml`. NetBox credentials default to the environment (`NETBOX_API` (URL), `NETBOX_TOKEN`);
 no placeholder values are defined anywhere.
 
 ## Requirements

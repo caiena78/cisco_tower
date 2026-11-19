@@ -8,10 +8,10 @@ cisco_snmp_netbox_enabled: true
 cisco_snmp_ise_enabled: true
 cisco_snmp_acl_debug: false
 
-# NetBox credentials: from env (NETBOX_URL / NETBOX_API) unless set in inventory/Vault.
+# NetBox credentials: from env (NETBOX_API (URL) / NETBOX_TOKEN) unless set in inventory/Vault.
 # No placeholder values, so they can never shadow the real ones.
-netbox_url: "{{ lookup('env', 'NETBOX_URL') }}"
-netbox_token: "{{ lookup('env', 'NETBOX_API') }}"
+netbox_url: "{{ lookup('env', 'NETBOX_API') }}"
+netbox_token: "{{ lookup('env', 'NETBOX_TOKEN') }}"
 netbox_validate_certs: false
 
 # Remove SNMPv3 users/hosts on the device that are not in cisco_snmp.users

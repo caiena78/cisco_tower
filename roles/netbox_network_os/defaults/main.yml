@@ -4,8 +4,8 @@
 
 # NetBox credentials come from the environment (populated from Vault, see ../../.env),
 # never from this role. No placeholder values.
-netbox_url: "{{ lookup('env', 'NETBOX_URL') }}"
-netbox_token: "{{ lookup('env', 'NETBOX_API') }}"
+netbox_url: "{{ lookup('env', 'NETBOX_API') }}"
+netbox_token: "{{ lookup('env', 'NETBOX_TOKEN') }}"
 # TLS verification uses netbox_validate_certs when it is set (other roles default it to false),
 # otherwise it is ON. Set netbox_validate_certs in inventory to control both.
 

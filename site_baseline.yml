@@ -1,6 +1,6 @@
 ---
 # Management baseline for Cisco devices from the NetBox inventory.
-# NetBox URL/token come from the environment (NETBOX_URL / NETBOX_API, populated from Vault - see .env).
+# NetBox URL/token come from the environment (NETBOX_API (URL) / NETBOX_TOKEN, populated from Vault - see .env).
 # network_facts goes first so platform, NETCONF/CLI transport, NetBox site and management VRF are
 # decided once per host.
 #

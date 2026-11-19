@@ -19,7 +19,7 @@
               - netbox_url | length > 0
               - netbox_token | length > 0
             fail_msg: >-
-              NetBox URL/token are empty. Export NETBOX_URL and NETBOX_API from Vault
+              NetBox URL/token are empty. Export NETBOX_API (URL) and NETBOX_TOKEN from Vault
               (see .env: set -a; source .env; set +a) or set netbox_url / netbox_token.
             quiet: true
 

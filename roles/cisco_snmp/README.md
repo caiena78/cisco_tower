@@ -44,7 +44,7 @@ secrets localized/hashed, so they cannot be read back and diffed over NETCONF. S
 | `cisco_snmp_netbox_enabled` / `cisco_snmp_ise_enabled` | toggle those sections |
 | `cisco_snmp_acl_debug` | print the NetBox addresses used for the ACL |
 | `ise_hostname, ise_port, ise_username, ise_password, ise_verify` | Cisco ISE ERS API (provide via vault/group_vars) |
-| `netbox_url, netbox_token` | default to env `NETBOX_URL` / `NETBOX_API` (no placeholders) |
+| `netbox_url, netbox_token` | default to env `NETBOX_API` / `NETBOX_TOKEN` (no placeholders) |
 
 Keep passwords in Ansible Vault. Tasks that carry secrets use `no_log`.
 

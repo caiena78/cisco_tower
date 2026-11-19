@@ -3,7 +3,7 @@
 # Replaces the old standalone mgnt_acl / ACL_update.yml run.
 #
 # Tower: one job template, no job tags needed. Limit is prompted on launch.
-# NetBox URL/token come from the environment (NETBOX_URL / NETBOX_API, populated from Vault).
+# NetBox URL/token come from the environment (NETBOX_API (URL) / NETBOX_TOKEN, populated from Vault).
 #
 #   ansible-playbook -i netbox_inventory.yml snmp_acl_update.yml --limit <host> --check --diff
 #

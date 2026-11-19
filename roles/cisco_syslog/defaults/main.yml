@@ -9,9 +9,9 @@ cisco_syslog_netbox_enabled: true
 cisco_syslog_netbox_field: syslog
 cisco_syslog_debug: false
 
-# NetBox credentials: from env (NETBOX_URL / NETBOX_API) unless set in inventory/Vault.
-netbox_url: "{{ lookup('env', 'NETBOX_URL') }}"
-netbox_token: "{{ lookup('env', 'NETBOX_API') }}"
+# NetBox credentials: from env (NETBOX_API (URL) / NETBOX_TOKEN) unless set in inventory/Vault.
+netbox_url: "{{ lookup('env', 'NETBOX_API') }}"
+netbox_token: "{{ lookup('env', 'NETBOX_TOKEN') }}"
 netbox_validate_certs: false
 
 cisco_syslog:

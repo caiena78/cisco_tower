@@ -22,7 +22,7 @@ the right platform. Run it before anything that connects to the device.
 
 ## NetBox credentials
 
-Same convention as the rest of the project: `NETBOX_URL` and `NETBOX_API` in the environment, filled from
+Same convention as the rest of the project: `NETBOX_API` (URL) and `NETBOX_TOKEN` in the environment, filled from
 Vault (see `.env`: `set -a; source .env; set +a`, with an authenticated Vault session). Nothing secret is
 stored in the role, and there are no placeholder values; the role stops with a clear message if they are empty.
 Requests use `no_log`. TLS verification follows `netbox_validate_certs` (on if unset).

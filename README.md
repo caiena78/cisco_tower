@@ -43,11 +43,11 @@ address, mount, path and field names):
 
 ```bash
 vault login                      # or export VAULT_TOKEN
-set -a; source .env; set +a      # exports NETBOX_URL / NETBOX_API for the run
+set -a; source .env; set +a      # exports NETBOX_API (URL) / NETBOX_TOKEN for the run
 ```
 
 In Tower, supply them through a credential or the job template environment. The roles read
-`NETBOX_URL` and `NETBOX_API` from the environment and stop with a clear message if they are empty.
+`NETBOX_API` (URL) and `NETBOX_TOKEN` from the environment and stop with a clear message if they are empty.
 
 Also keep these in Vault / Tower credentials (never in `group_vars`):
 

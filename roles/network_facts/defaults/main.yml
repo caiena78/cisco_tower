@@ -23,6 +23,6 @@ network_netconf_fallback_on_error: true
 network_save_config: false
 
 # ---- NetBox (credentials come from env/Vault, no placeholders) ----
-netbox_url: "{{ lookup('env', 'NETBOX_URL') }}"
-netbox_token: "{{ lookup('env', 'NETBOX_API') }}"
+netbox_url: "{{ lookup('env', 'NETBOX_API') }}"
+netbox_token: "{{ lookup('env', 'NETBOX_TOKEN') }}"
 netbox_validate_certs: false
