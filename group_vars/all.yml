@@ -9,3 +9,7 @@ ansible_connection: ansible.netcommon.network_cli
 # tasks have their own switch, network_netconf_host_key_checking (roles/network_facts/defaults).
 ansible_host_key_checking: false
 network_netconf_host_key_checking: false
+
+# Device login from the environment (see .env). Tower credentials / -e extra vars override these.
+ansible_password: "{{ lookup('ansible.builtin.env', 'DEVICE_PASSWORD') }}"
+ansible_become_password: "{{ lookup('ansible.builtin.env', 'DEVICE_ENABLE_PASSWORD') }}"
