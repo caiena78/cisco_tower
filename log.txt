@@ -1,0 +1,398 @@
+
+PLAY [Cisco management baseline] ***********************************************
+
+TASK [netbox_network_os : Keep existing ansible_network_os] ********************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [netbox_network_os : Require NetBox connection settings] ******************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [netbox_network_os : Get device from NetBox] ******************************
+ok: [lv-idf-rehab-9300-1 -> localhost]
+
+TASK [netbox_network_os : Resolve and set ansible_network_os] ******************
+included: /home/ansible/repos/tower/roles/netbox_network_os/tasks/resolve.yml for lv-idf-rehab-9300-1
+
+TASK [netbox_network_os : Read the platform slug] ******************************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [netbox_network_os : Normalise the slug] **********************************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [netbox_network_os : Refuse an ambiguous device name] *********************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [netbox_network_os : Map the slug to ansible_network_os] ******************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [netbox_network_os : Use the default for unmapped devices] ****************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [netbox_network_os : Explain why no value was found] **********************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [netbox_network_os : Apply ansible_network_os] ****************************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [netbox_network_os : Show result] *****************************************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [netbox_network_os : Mark done] *******************************************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [network_facts : Detect platform] *****************************************
+included: /home/ansible/repos/tower/roles/network_facts/tasks/platform.yml for lv-idf-rehab-9300-1
+
+TASK [network_facts : Determine platform] **************************************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [network_facts : Validate platform] ***************************************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [network_facts : Select transport (NETCONF or CLI)] ***********************
+included: /home/ansible/repos/tower/roles/network_facts/tasks/transport.yml for lv-idf-rehab-9300-1
+
+TASK [network_facts : Default to CLI] ******************************************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [network_facts : Honor forced CLI] ****************************************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [network_facts : Probe NETCONF TCP port] **********************************
+ok: [lv-idf-rehab-9300-1 -> localhost]
+
+TASK [network_facts : Record closed port] **************************************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [network_facts : Read a leaf from the device model over NETCONF] **********
+ok: [lv-idf-rehab-9300-1]
+
+TASK [network_facts : Accept NETCONF] ******************************************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [network_facts : Record missing model] ************************************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [network_facts : Fail when NETCONF is required but unusable] **************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [network_facts : Transport summary] ***************************************
+ok: [lv-idf-rehab-9300-1] => {
+    "msg": "lv-idf-rehab-9300-1: transport=netconf (NETCONF session ok, Cisco-IOS-XE-native model present)"
+}
+
+TASK [network_facts : NetBox site lookup] **************************************
+included: /home/ansible/repos/tower/roles/network_facts/tasks/netbox_site.yml for lv-idf-rehab-9300-1
+
+TASK [network_facts : Look up exact /32 prefix in NetBox] **********************
+ok: [lv-idf-rehab-9300-1 -> localhost]
+
+TASK [network_facts : Look up containing prefixes in NetBox] *******************
+ok: [lv-idf-rehab-9300-1 -> localhost]
+
+TASK [network_facts : Pick the most specific prefix and its site URL] **********
+ok: [lv-idf-rehab-9300-1]
+
+TASK [network_facts : Get NetBox site] *****************************************
+ok: [lv-idf-rehab-9300-1 -> localhost]
+
+TASK [network_facts : Warn when no NetBox site found] **************************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [network_facts : Management interface and VRF] ****************************
+included: /home/ansible/repos/tower/roles/network_facts/tasks/mgmt_ios.yml for lv-idf-rehab-9300-1
+
+TASK [network_facts : Gather L3 interfaces (IOS)] ******************************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [network_facts : Find the interface holding ansible_host] *****************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [network_facts : Read VRF of the management interface] ********************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [network_facts : Set vrf_name] ********************************************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [network_facts : Show management interface] *******************************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [network_facts : Mark facts as gathered] **********************************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Common setup] ***********************************************
+included: /home/ansible/repos/tower/roles/cisco_snmp/tasks/init.yml for lv-idf-rehab-9300-1
+
+TASK [Gather shared network facts (platform, transport, NetBox site, mgmt VRF)] ***
+included: network_facts for lv-idf-rehab-9300-1
+
+TASK [network_facts : Detect platform] *****************************************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [network_facts : Select transport (NETCONF or CLI)] ***********************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [network_facts : NetBox site lookup] **************************************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [network_facts : Management interface and VRF] ****************************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [network_facts : Mark facts as gathered] **********************************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Set platform] ***********************************************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Validate platform] ******************************************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Show cisco_snmp role version] *******************************
+ok: [lv-idf-rehab-9300-1] => {
+    "msg": "cisco_snmp role version 2.0 (ios, transport=netconf)"
+}
+
+TASK [cisco_snmp : NetBox location] ********************************************
+included: /home/ansible/repos/tower/roles/cisco_snmp/tasks/netbox.yml for lv-idf-rehab-9300-1
+
+TASK [cisco_snmp : Set SNMP location fact from NetBox custom field] ************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Management ACL from NetBox] *********************************
+included: /home/ansible/repos/tower/roles/cisco_snmp/tasks/acl.yml for lv-idf-rehab-9300-1
+
+TASK [cisco_snmp : Common setup] ***********************************************
+included: /home/ansible/repos/tower/roles/cisco_snmp/tasks/init.yml for lv-idf-rehab-9300-1
+
+TASK [Gather shared network facts (platform, transport, NetBox site, mgmt VRF)] ***
+included: network_facts for lv-idf-rehab-9300-1
+
+TASK [network_facts : Detect platform] *****************************************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [network_facts : Select transport (NETCONF or CLI)] ***********************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [network_facts : NetBox site lookup] **************************************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [network_facts : Management interface and VRF] ****************************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [network_facts : Mark facts as gathered] **********************************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Set platform] ***********************************************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Validate platform] ******************************************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Resolve ACL definition] *************************************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Get IPs tagged snmp_acl_allow from NetBox] ******************
+ok: [lv-idf-rehab-9300-1 -> localhost]
+
+TASK [cisco_snmp : Refuse a truncated NetBox result] ***************************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Extract IPv4 management addresses] **************************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Refuse an empty ACL] ****************************************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Show ACL addresses] *****************************************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Reset ACL state] ********************************************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Replace ACL (NETCONF)] **************************************
+changed: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Mark ACL done] **********************************************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Apply ACL over CLI] *****************************************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : SNMP location (NETCONF, CLI fallback)] **********************
+included: /home/ansible/repos/tower/roles/cisco_snmp/tasks/location.yml for lv-idf-rehab-9300-1
+
+TASK [cisco_snmp : Reset location state] ***************************************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Push location (NETCONF)] ************************************
+[ERROR]: Task failed: Action failed: {'type': 'application', 'tag': 'unknown-element', 'app_tag': None, 'severity': 'error', 'info': '<?xml version="1.0" encoding="UTF-8"?><error-info xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0"><bad-element>snmp-server</bad-element>\n</error-info>\n', 'path': '\n    /nc:rpc/nc:edit-config/nc:config/ios:native/ios-snmp:snmp-server\n  ', 'message': None}
+Origin: /home/ansible/repos/tower/roles/cisco_snmp/tasks/location.yml:10:7
+
+ 8   when: network_transport == 'netconf'
+ 9   block:
+10     - name: Push location (NETCONF)
+         ^ column 7
+
+fatal: [lv-idf-rehab-9300-1]: FAILED! => {"changed": false, "msg": "{'type': 'application', 'tag': 'unknown-element', 'app_tag': None, 'severity': 'error', 'info': '<?xml version=\"1.0\" encoding=\"UTF-8\"?><error-info xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\" xmlns:nc=\"urn:ietf:params:xml:ns:netconf:base:1.0\"><bad-element>snmp-server</bad-element>\\n</error-info>\\n', 'path': '\\n    /nc:rpc/nc:edit-config/nc:config/ios:native/ios-snmp:snmp-server\\n  ', 'message': None}"}
+
+TASK [cisco_snmp : NETCONF location failed] ************************************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Falling back to CLI for location] ***************************
+ok: [lv-idf-rehab-9300-1] => {
+    "msg": "lv-idf-rehab-9300-1: NETCONF location failed ({'type': 'application', 'tag': 'unknown-element', 'app_tag': None, 'severity': 'error', 'info': '<?xml version=\"1.0\" encoding=\"UTF-8\"?><error-info...); using CLI"
+}
+
+TASK [cisco_snmp : Set SNMP location (IOS CLI)] ********************************
+changed: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Set SNMP location (NX-OS CLI)] ******************************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Configure SNMP on IOS / IOS-XE] *****************************
+included: /home/ansible/repos/tower/roles/cisco_snmp/tasks/ios.yml for lv-idf-rehab-9300-1
+
+TASK [cisco_snmp : Reset core SNMP state] **************************************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Configure SNMP core over NETCONF] ***************************
+included: /home/ansible/repos/tower/roles/cisco_snmp/tasks/ios_netconf.yml for lv-idf-rehab-9300-1
+
+TASK [cisco_snmp : Edit-config SNMP views, groups, users, hosts] ***************
+[ERROR]: Task failed: Action failed: {'type': 'application', 'tag': 'unknown-element', 'app_tag': None, 'severity': 'error', 'info': '<?xml version="1.0" encoding="UTF-8"?><error-info xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0"><bad-element>snmp-server</bad-element>\n</error-info>\n', 'path': '\n    /nc:rpc/nc:edit-config/nc:config/ios:native/ios-snmp:snmp-server\n  ', 'message': None}
+Origin: /home/ansible/repos/tower/roles/cisco_snmp/tasks/ios_netconf.yml:7:7
+
+5 - name: Push SNMP core config (NETCONF)
+6   block:
+7     - name: Edit-config SNMP views, groups, users, hosts
+        ^ column 7
+
+fatal: [lv-idf-rehab-9300-1]: FAILED! => {"censored": "the output has been hidden due to the fact that 'no_log: true' was specified for this result", "changed": false}
+
+TASK [cisco_snmp : NETCONF core failed] ****************************************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Falling back to CLI for SNMP core] **************************
+ok: [lv-idf-rehab-9300-1] => {
+    "msg": "lv-idf-rehab-9300-1: NETCONF SNMP update failed; using CLI"
+}
+
+TASK [cisco_snmp : Configure SNMP core over CLI] *******************************
+included: /home/ansible/repos/tower/roles/cisco_snmp/tasks/ios_core_cli.yml for lv-idf-rehab-9300-1
+
+TASK [cisco_snmp : Configure SNMP views (RO/RW)] *******************************
+ok: [lv-idf-rehab-9300-1] => (item=ro => ROview)
+ok: [lv-idf-rehab-9300-1] => (item=rw => RWview)
+
+TASK [cisco_snmp : Configure SNMP groups (RO / RW)] ****************************
+changed: [lv-idf-rehab-9300-1] => (item=ro)
+changed: [lv-idf-rehab-9300-1] => (item=rw)
+
+TASK [cisco_snmp : Configure SNMP group context] *******************************
+changed: [lv-idf-rehab-9300-1] => (item=ro)
+changed: [lv-idf-rehab-9300-1] => (item=rw)
+
+TASK [cisco_snmp : Get existing SNMPv3 user lines] *****************************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Build map of existing SNMPv3 user -> config line] ***********
+ok: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Remove SNMPv3 users we manage (exact existing line)] ********
+skipping: [lv-idf-rehab-9300-1] => (item=ROuser) 
+skipping: [lv-idf-rehab-9300-1] => (item=RWuser) 
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Configure SNMPv3 users] *************************************
+changed: [lv-idf-rehab-9300-1] => (item=(censored due to no_log))
+changed: [lv-idf-rehab-9300-1] => (item=(censored due to no_log))
+
+TASK [cisco_snmp : Get existing SNMP host lines] *******************************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Build desired SNMP host lines (users with 'host')] **********
+ok: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Remove existing SNMP host lines for managed users] **********
+ok: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Configure SNMP hosts] ***************************************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Get SNMP community config lines] ****************************
+ok: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Extract RO/RW communities not yet on the management ACL] ****
+ok: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Apply ACL to communities] ***********************************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Cleanup | Gather SNMP user and host lines] ******************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Cleanup | Compute users to remove] **************************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Cleanup | Show plan] ****************************************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Cleanup | Remove host lines of removed users] ***************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Cleanup | Remove user lines of removed users] ***************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Cleanup | Verify] *******************************************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Cleanup | Fail if removed users remain] *********************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Configure SNMP on NX-OS] ************************************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Sync SNMPv3 credentials to Cisco ISE] ***********************
+included: /home/ansible/repos/tower/roles/cisco_snmp/tasks/ise.yml for lv-idf-rehab-9300-1
+
+TASK [cisco_snmp : Determine SNMPv3 user(s) designated for Cisco ISE] **********
+ok: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Skip message if no SNMPv3 user is flagged for Cisco ISE] ****
+ok: [lv-idf-rehab-9300-1] => {
+    "msg": "No user in cisco_snmp.users has cisco_ise: true - skipping Cisco ISE SNMP sync"
+}
+
+TASK [cisco_snmp : Set desired ISE SNMP user (first flagged user)] *************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Map SNMPv3 protocols to Cisco ISE values] *******************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Check if device exists in Cisco ISE by IP] ******************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Set ISE device-found flag] **********************************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Get full device record from Cisco ISE] **********************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Build updated SNMP settings for Cisco ISE] ******************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Push updated SNMP settings to Cisco ISE] ********************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Log full ISE response for troubleshooting on failure] *******
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Fail if Cisco ISE SNMP update failed] ***********************
+skipping: [lv-idf-rehab-9300-1]
+
+TASK [cisco_snmp : Warn if device was not found in Cisco ISE by IP] ************
+skipping: [lv-idf-rehab-9300-1]
+
+PLAY RECAP *********************************************************************
+lv-idf-rehab-9300-1        : ok=71   changed=5    unreachable=0    failed=0    skipped=47   rescued=2    ignored=0   
+

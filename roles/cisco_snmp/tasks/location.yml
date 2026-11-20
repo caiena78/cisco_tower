@@ -5,7 +5,9 @@
     cisco_snmp_location_done: false
 
 - name: Set location over NETCONF
-  when: network_transport == 'netconf'
+  when:
+    - network_transport == 'netconf'
+    - cisco_snmp_os != 'ios' or cisco_snmp_netconf_snmp_server | bool
   block:
     - name: Push location (NETCONF)
       ansible.netcommon.netconf_config:

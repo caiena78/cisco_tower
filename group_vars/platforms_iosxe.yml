@@ -1,0 +1,68 @@
+ios_snmp_cleanup: false
+
+ios_snmp:
+  # ------------------------------------------------------------
+  # ACL (built via NetBox elsewhere, referenced here by name)
+  # ------------------------------------------------------------
+  acl:
+    name: MANAGEMENT
+    tag: snmp_acl_allow
+
+  # ------------------------------------------------------------
+  # Views
+  # ------------------------------------------------------------
+  views:
+    ro: LCMCROview
+    rw: LCMCRWview
+
+  # ------------------------------------------------------------
+  # Groups
+  # ------------------------------------------------------------
+  groups:
+    ro: network-operator
+    rw: network-admin
+
+  group_context:
+    enabled: true
+    prefix: "vlan-"
+
+  # ------------------------------------------------------------
+  # Standard SNMPv3 users (RO / RW)
+  # ------------------------------------------------------------
+  users:
+    - username: LCMCROuser
+      access: ro
+      auth_proto: sha
+      auth_pass: "C0st0CHONdr!t!s"
+      priv_proto: aes
+      priv_bits: 128
+      priv_pass: "W3@kBr3astBONE"
+      cisco_ise: false
+
+    - username: LCMCROcer
+      access: ro
+      auth_proto: sha
+      auth_pass: "LCMC_Ci5c0_C3r"
+      priv_proto: aes
+      priv_bits: 128
+      priv_pass: "LCMC_Ci5c0_Iphon3"
+      cisco_ise: false
+
+    - username: LCMCRWuser
+      access: rw
+      auth_proto: sha
+      auth_pass: "S3nsiT!vE"
+      priv_proto: aes
+      priv_bits: 128
+      priv_pass: "W3@kBr3astBONE"
+      cisco_ise: false
+
+    - username: catctruser
+      access: rw
+      auth_proto: sha
+      auth_pass: "j6HJfXcfCcFDrrqp"
+      priv_proto: aes
+      priv_bits: 128
+      priv_pass: "uUZ0Hc9fve84GcCf"
+      cisco_ise: true
+     

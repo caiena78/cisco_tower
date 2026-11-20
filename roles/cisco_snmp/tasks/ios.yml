@@ -7,7 +7,9 @@
 
 - name: Configure SNMP core over NETCONF
   ansible.builtin.include_tasks: ios_netconf.yml
-  when: network_transport == 'netconf'
+  when:
+    - network_transport == 'netconf'
+    - cisco_snmp_netconf_snmp_server | bool
 
 - name: Configure SNMP core over CLI
   ansible.builtin.include_tasks: ios_core_cli.yml

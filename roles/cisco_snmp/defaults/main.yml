@@ -8,6 +8,11 @@ cisco_snmp_netbox_enabled: true
 cisco_snmp_ise_enabled: true
 cisco_snmp_acl_debug: false
 
+# IOS/IOS-XE: push snmp-server (location, views, groups, users) over NETCONF. Off by default: current
+# IOS-XE (e.g. Catalyst 9300) rejects the Cisco-IOS-XE-snmp path with unknown-element, so it went
+# to CLI after a failed attempt anyway. The management ACL still uses NETCONF.
+cisco_snmp_netconf_snmp_server: false
+
 # NetBox credentials: from env (NETBOX_API (URL) / NETBOX_TOKEN) unless set in inventory/Vault.
 # No placeholder values, so they can never shadow the real ones.
 netbox_url: "{{ lookup('env', 'NETBOX_API') }}"
