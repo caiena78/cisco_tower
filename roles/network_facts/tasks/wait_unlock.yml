@@ -1,0 +1,63 @@
+---
+# IOS-XE: wait until no NETCONF datastore is locked, using NETCONF only (RFC 6022
+# ietf-netconf-monitoring: /netconf-state/datastores/datastore/locks). If it is still locked after the
+# wait and network_netconf_clear_lock is true, the holding session is ended with the standard
+# <kill-session> RPC; if the device refuses that, `clear configuration lock` is sent over CLI.
+# A failed lock query (model not available) is not an error: the caller just proceeds.
+# Call: include_role {name: network_facts, tasks_from: wait_unlock.yml}
+- name: Check the NETCONF datastore lock (wait while locked)
+  ansible.netcommon.netconf_get:
+    filter: >-
+      <netconf-state xmlns="urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring"><datastores/></netconf-state>
+    display: xml
+  register: network_netconf_lock_wait
+  until: network_netconf_lock_wait.stdout | default('') is not search('locked-by-session')
+  retries: "{{ network_netconf_lock_retries }}"
+  delay: "{{ network_netconf_lock_interval }}"
+  ignore_errors: true
+  changed_when: false
+  vars:
+    ansible_connection: ansible.netcommon.netconf
+    ansible_host_key_checking: "{{ network_netconf_host_key_checking }}"
+    ansible_network_os: default
+    ansible_port: "{{ network_netconf_port }}"
+
+- name: Work out the session holding the lock
+  ansible.builtin.set_fact:
+    network_netconf_lock_session: >-
+      {{ network_netconf_lock_wait.stdout | default('')
+         | regex_search('locked-by-session>\s*([0-9]+)', '\1') | first | default('') }}
+  when: network_netconf_lock_wait.stdout | default('') is search('locked-by-session')
+
+- name: Lock still held after waiting
+  ansible.builtin.debug:
+    msg: >-
+      {{ inventory_hostname }}: NETCONF datastore still locked by session
+      {{ network_netconf_lock_session | default('?') }} after
+      {{ network_netconf_lock_retries | int * network_netconf_lock_interval | int }}s{{
+      '; clearing it' if network_netconf_clear_lock | bool else '' }}
+  when: network_netconf_lock_session | default('') | length > 0
+
+- name: Clear the lock
+  when:
+    - network_netconf_lock_session | default('') | length > 0
+    - network_netconf_clear_lock | bool
+  block:
+    - name: End the lock-holding session (NETCONF kill-session)
+      ansible.netcommon.netconf_rpc:
+        rpc: kill-session
+        xmlns: "urn:ietf:params:xml:ns:netconf:base:1.0"
+        content: "<session-id>{{ network_netconf_lock_session }}</session-id>"
+      vars:
+        ansible_connection: ansible.netcommon.netconf
+        ansible_host_key_checking: "{{ network_netconf_host_key_checking }}"
+        ansible_network_os: default
+        ansible_port: "{{ network_netconf_port }}"
+  rescue:
+    # e.g. the lock belongs to the device's own yang_mgmt_infra session, which cannot be killed
+    - name: kill-session refused; clearing the lock over CLI
+      cisco.ios.ios_command:
+        commands:
+          - clear configuration lock
+      changed_when: false
+      failed_when: false

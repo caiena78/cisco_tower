@@ -23,6 +23,14 @@ network_netconf_probe_timeout: 3
 network_netconf_host_key_checking: false
 # If a NETCONF edit fails mid-run, redo that role's work over CLI
 network_netconf_fallback_on_error: true
+# IOS-XE: before a NETCONF edit, poll the datastore lock (over NETCONF) every interval seconds for up
+# to retries times. If it is still locked afterwards and clear_lock is true, the holding session is
+# ended with <kill-session>, falling back to CLI `clear configuration lock` if refused (a lock left by
+# a stale yang_mgmt_infra session never frees itself). false = leave it and let the edit fail / fall
+# back to CLI.
+network_netconf_lock_retries: 6
+network_netconf_lock_interval: 5
+network_netconf_clear_lock: true
 # Save running -> startup after NETCONF edits (NX-OS needs one CLI command for this)
 network_save_config: false
 

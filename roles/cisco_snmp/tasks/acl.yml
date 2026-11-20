@@ -63,6 +63,11 @@
 - name: Apply ACL over NETCONF
   when: network_transport == 'netconf'
   block:
+    - name: Wait for NETCONF datastore lock
+      ansible.builtin.include_role:
+        name: network_facts
+        tasks_from: wait_unlock.yml
+
     - name: Replace ACL (NETCONF)
       ansible.netcommon.netconf_config:
         content: "{{ lookup('ansible.builtin.template', 'netconf/' ~ cisco_snmp_os ~ '_acl.xml.j2') }}"

@@ -23,6 +23,11 @@
 - name: Configure syslog over NETCONF
   when: network_transport == 'netconf'
   block:
+    - name: Wait for NETCONF datastore lock
+      ansible.builtin.include_role:
+        name: network_facts
+        tasks_from: wait_unlock.yml
+
     - name: Edit-config syslog (NETCONF)
       ansible.netcommon.netconf_config:
         content: "{{ lookup('ansible.builtin.template', 'netconf/ios_syslog.xml.j2') }}"

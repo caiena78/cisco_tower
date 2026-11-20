@@ -2,7 +2,7 @@
   <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
     <logging>
       <origin-id>
-        <hostname/>
+        <type-value>hostname</type-value>
       </origin-id>
 {% if cisco_syslog_src_if != 'NOT_SET' %}
       <source-interface>
@@ -19,9 +19,7 @@
           <ipv4-host>{{ s.ip | e }}</ipv4-host>
           <transport>
             <{{ s.protocol }}>
-              <{{ s.protocol }}-port-list>
-                <port>{{ s.port }}</port>
-              </{{ s.protocol }}-port-list>
+              <port>{{ s.port }}</port>
             </{{ s.protocol }}>
           </transport>
         </ipv4-host-transport-list>
@@ -32,9 +30,7 @@
           <vrf>{{ cisco_syslog_vrf | e }}</vrf>
           <transport>
             <{{ s.protocol }}>
-              <{{ s.protocol }}-port-list>
-                <port>{{ s.port }}</port>
-              </{{ s.protocol }}-port-list>
+              <port>{{ s.port }}</port>
             </{{ s.protocol }}>
           </transport>
         </ipv4-host-vrf-transport-list>
